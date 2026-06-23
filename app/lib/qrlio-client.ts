@@ -94,8 +94,8 @@ export function pollExamStatus(
       const status = await getExamStatus(examId)
       onUpdate(status)
 
-      // Estados terminais: completed, failed, consensus_failed, validation_failed
-      const terminalStatuses = ['completed', 'failed', 'consensus_failed', 'validation_failed'];
+      // Estados terminais: ready (extração ok, aguardando wizard), completed (legado), failed, consensus_failed, validation_failed
+      const terminalStatuses = ['ready', 'completed', 'failed', 'consensus_failed', 'validation_failed'];
       if (terminalStatuses.includes(status.status)) {
         stop()
         onComplete(status)

@@ -19,7 +19,6 @@ export default function CalculatorsPage() {
   const selectedLenses = useBiometryStore((s) => s.selectedLenses)
   const setSelectedLenses = useBiometryStore((s) => s.setSelectedLenses)
   const setCalculationResults = useBiometryStore((s) => s.setCalculationResults)
-  const existingResults = useBiometryStore((s) => s.calculationResults)
   const surgicalPresets = useBiometryStore((s) => s.surgicalPresets)
   const activePreset = useBiometryStore((s) => s.activeSurgicalPreset)
   const setPreset = useBiometryStore((s) => s.setSurgicalPreset)
@@ -149,9 +148,29 @@ export default function CalculatorsPage() {
           <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.25rem' }}>
             1. Lentes para calcular
           </h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
-            Selecione o fabricante → escolha até 3 LIOs
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.5rem' }}>
+            Selecione o fabricante → escolha de <strong>1 a 3 LIOs</strong>
           </p>
+
+          {/* Tier explanation */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            {(['premium', 'intermediate', 'standard'] as IOLTier[]).map((tier) => (
+              <div key={tier} style={{
+                flex: '1 1 180px',
+                padding: '0.5rem 0.6rem',
+                borderRadius: 8,
+                background: tier === 'premium' ? '#fef3c7' : tier === 'intermediate' ? '#e0e7ff' : '#f1f5f9',
+                border: `1px solid ${tier === 'premium' ? '#fbbf24' : tier === 'intermediate' ? '#818cf8' : '#cbd5e1'}`,
+                fontSize: '0.7rem',
+                lineHeight: 1.4,
+              }}>
+                <div style={{ fontWeight: 700, color: tier === 'premium' ? '#92400e' : tier === 'intermediate' ? '#3730a3' : '#475569', marginBottom: 2 }}>
+                  {TIER_LABELS[tier][0]}
+                </div>
+                <div style={{ color: 'var(--text-secondary)' }}>{TIER_LABELS[tier][1]}</div>
+              </div>
+            ))}
+          </div>
 
           {/* Selected chips */}
           {selectedLenses.length > 0 && (
@@ -311,9 +330,47 @@ export default function CalculatorsPage() {
 
         {/* ── 3. Calculator Selection ── */}
         <div className="card" style={{ padding: '1.25rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.5rem' }}>
-            3. Calculadoras ({selectedCalcs.size} selecionadas)
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem', flexWrap: 'wrap', gap: 8 }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              3. Calculadoras ({selectedCalcs.size}/{CALCULATORS.length})
+            </h3>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="btn-ghost"
+                onClick={() => setSelectedCalcs(new Set(CALCULATORS.map(c => c.id)))}
+                style={{ fontSize: '0.7rem', padding: '0.25rem 0.6rem' }}
+              >
+                Selecionar todas
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => setSelectedCalcs(new Set())}
+                style={{ fontSize: '0.7rem', padding: '0.25rem 0.6rem' }}
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+
+          {/* Time estimate warning */}
+          {selectedCalcs.size > 0 && (
+            <div style={{
+              marginBottom: '0.75rem', padding: '0.5rem 0.75rem',
+              background: selectedCalcs.size >= 4 ? '#fef3c7' : '#f0f9ff',
+              border: `1px solid ${selectedCalcs.size >= 4 ? '#fbbf24' : '#bae6fd'}`,
+              borderRadius: 8, fontSize: '0.72rem', lineHeight: 1.5,
+              color: selectedCalcs.size >= 4 ? '#92400e' : '#0c4a6e',
+            }}>
+              {selectedCalcs.size <= 2 ? (
+                <span>⚡ <strong>{selectedCalcs.size} calculadora(s)</strong> — resultado rápido, ~10-15s por lente</span>
+              ) : selectedCalcs.size <= 4 ? (
+                <span>⏱️ <strong>{selectedCalcs.size} calculadoras</strong> — execução paralela, ~20-40s por lente</span>
+              ) : (
+                <span>🐢 <strong>{selectedCalcs.size} calculadoras</strong> — quanto mais calculadoras, mais demorado. Paralelo, ~40-90s por lente. <strong>Recomendado: 3-4 para boa cobertura.</strong></span>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {CALCULATORS.map((calc) => (
               <CalculatorCard
@@ -340,9 +397,16 @@ export default function CalculatorsPage() {
         <button className="btn-primary"
           disabled={selectedLenses.length === 0 || selectedCalcs.size === 0 || calculating}
           onClick={handleCalculate}
-          style={{ opacity: (selectedLenses.length === 0 || selectedCalcs.size === 0) ? 0.4 : 1 }}
+          style={{ opacity: (selectedLenses.length === 0 || selectedCalcs.size === 0) ? 0.4 : 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}
         >
-          {calculating ? '⏳ Calculando...' : `Calcular ${selectedLenses.length} lente(s) × ${selectedCalcs.size} calc(s)`}
+          <span style={{ fontSize: '0.85rem' }}>
+            {calculating ? '⏳ Calculando...' : `Calcular ${selectedLenses.length} lente(s) × ${selectedCalcs.size} calc(s)`}
+          </span>
+          {!calculating && selectedLenses.length > 0 && selectedCalcs.size > 0 && (
+            <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
+              Est. ~{selectedCalcs.size >= 4 ? '40-90s' : selectedCalcs.size >= 3 ? '20-40s' : '10-15s'} por lente • {selectedLenses.length * selectedCalcs.size} cálculos em paralelo
+            </span>
+          )}
         </button>
       </div>
     </AppShell>

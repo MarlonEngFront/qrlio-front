@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
   consensus_failed: 'Consenso divergente',
   validation_failed: 'Dados fora do padrão',
   calculating: 'Calculando LIO...',
+  ready: 'Pronto — aguardando calculadoras',
   completed: 'Concluído',
   failed: 'Falhou',
 }
@@ -69,14 +70,14 @@ export default function StatusTracker({ examId, onComplete, onError }: Props) {
 
   const currentStatus = status?.status || 'uploaded'
   const label = STATUS_LABELS[currentStatus] || currentStatus
-  const isActive = !['completed', 'failed', 'consensus_failed', 'validation_failed'].includes(currentStatus)
+  const isActive = !['ready', 'completed', 'failed', 'consensus_failed', 'validation_failed'].includes(currentStatus)
   const dots = isActive ? '.'.repeat((elapsed % 3) + 1) : ''
 
   return (
     <div className="card" style={{ marginTop: '1.5rem', padding: '1.25rem 1.5rem' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <span style={{ fontSize: '1.5rem' }}>{isActive ? '🔍' : currentStatus === 'completed' ? '🎯' : '❌'}</span>
+        <span style={{ fontSize: '1.5rem' }}>{isActive ? '🔍' : currentStatus === 'ready' ? '✅' : currentStatus === 'completed' ? '🎯' : '❌'}</span>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: isActive ? 'var(--text-primary)' : 'var(--accent)' }}>

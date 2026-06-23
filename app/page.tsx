@@ -5,39 +5,15 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/app/components/AppShell'
 import FileDropZone from '@/app/components/ui/FileDropZone'
 import StatusTracker from '@/app/components/ui/StatusTracker'
-import { uploadExam, type ExamStatus, type CalculatorOutput } from '@/app/lib/qrlio-client'
-import { useBiometryStore, type ParsedBiometry, type BiometryMeta, type CalculatorResult } from '@/app/stores/biometry-store'
-import { CALCULATORS } from '@/app/lib/calculator-types'
+import { uploadExam, type ExamStatus } from '@/app/lib/qrlio-client'
+import { useBiometryStore, type ParsedBiometry, type BiometryMeta } from '@/app/stores/biometry-store'
 import type { EyeData } from '@/app/types/biometrics'
 
 export default function UploadPage() {
   const router = useRouter()
   const setBiometry = useBiometryStore((s) => s.setBiometry)
-  const setCalculationResults = useBiometryStore((s) => s.setCalculationResults)
   const setFileDataUrl = useBiometryStore((s) => s.setFileDataUrl)
   const clearAll = useBiometryStore((s) => s.clearAll)
-
-  // Mapeia resultados do worker → formato da store
-  const mapWorkerResults = useCallback((workerResults: CalculatorOutput[]): CalculatorResult[] => {
-    return workerResults.map((r) => {
-      const calcMeta = CALCULATORS.find((c) => c.id === r.calculator)
-      const out = r.output_fields || {}
-      return {
-        calculatorId: r.calculator,
-        calculatorLabel: calcMeta?.label || r.calculator,
-        status: r.status,
-        results: [{
-          eye: 'OD' as const,
-          iolPower: out.iolPower as number | undefined,
-          predictedRefraction: out.predictedRefraction as number | undefined,
-          toricModel: out.toricModel as string | undefined,
-          toricAxis: out.toricAxis as number | undefined,
-          residualAstigmatism: out.residualAstigmatism as number | undefined,
-        }],
-        durationMs: r.duration_ms,
-      }
-    })
-  }, [])
 
   const [phase, setPhase] = useState<'idle' | 'uploading' | 'processing'>('idle')
   const [examId, setExamId] = useState<string | null>(null)
@@ -64,11 +40,11 @@ export default function UploadPage() {
       const upload = await uploadExam(file)
       setExamId(upload.exam_id)
 
-      // Se já em cache e completo, vai direto pra validação
+      // Se já em cache e completo (legado) ou ready, vai direto pra validação
       if (upload.cached) {
         const { getExamStatus } = await import('@/app/lib/qrlio-client')
         const status = await getExamStatus(upload.exam_id)
-        if (status.status === 'completed') {
+        if (status.status === 'completed' || status.status === 'ready') {
           handleCompleted(status, file.name, file.size, file.type)
           return
         }
@@ -101,7 +77,7 @@ export default function UploadPage() {
 
     const biometry: ParsedBiometry = {
       OD: toEye(status.od),
-      OE: toEye(status.oe), // extração real do OE
+      OE: toEye(status.oe),
     }
 
     const meta: BiometryMeta = {
@@ -115,15 +91,10 @@ export default function UploadPage() {
       consensusScore: status.consensus_score ?? undefined,
     }
 
-    // Mapeia resultados das calculadoras para a store
-    if (status.results && status.results.length > 0) {
-      const calcResults = mapWorkerResults(status.results)
-      setCalculationResults(calcResults)
-    }
-
+    // Não mapeia resultados automáticos — o wizard de calculadoras fará isso sob demanda
     setBiometry(biometry, meta)
     router.push('/validate')
-  }, [setBiometry, setCalculationResults, mapWorkerResults, router])
+  }, [setBiometry, router])
 
   const handleProcessingComplete = useCallback((status: ExamStatus) => {
     handleCompleted(status, filename || 'unknown', 0, 'unknown')
