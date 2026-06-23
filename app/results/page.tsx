@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/app/components/AppShell'
 import { useBiometryStore } from '@/app/stores/biometry-store'
@@ -11,6 +11,8 @@ export default function ResultsPage() {
   const meta = useBiometryStore((s) => s.meta)
   const results = useBiometryStore((s) => s.calculationResults)
   const selectedLenses = useBiometryStore((s) => s.selectedLenses)
+  const surgeryParams = useBiometryStore((s) => s.surgeryParams)
+  const [expandedParams, setExpandedParams] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     if (!biometry) router.push('/')
@@ -76,6 +78,76 @@ export default function ResultsPage() {
                   {r.error}
                 </div>
               )}
+
+              {/* Parâmetros utilizados (collapsible) */}
+              <div style={{ marginBottom: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    const next = new Set(expandedParams)
+                    if (next.has(i)) next.delete(i); else next.add(i)
+                    setExpandedParams(next)
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: '0.7rem', color: 'var(--text-muted)',
+                    padding: 0,
+                  }}
+                >
+                  <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: expandedParams.has(i) ? 'rotate(90deg)' : undefined }}>▶</span>
+                  Parâmetros utilizados
+                </button>
+                {expandedParams.has(i) && (
+                  <div style={{
+                    marginTop: '0.4rem', padding: '0.6rem 0.75rem',
+                    background: 'var(--bg-secondary)', borderRadius: 8,
+                    fontSize: '0.7rem', lineHeight: 1.6,
+                    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.4rem 1rem',
+                  }}>
+                    {/* Lens info */}
+                    {(() => {
+                      const lensLabel = r.calculatorLabel.split(' — ')[1]
+                      const lens = lensLabel ? selectedLenses.find(l => {
+                        const full = `${l.manufacturer} ${l.model}`
+                        return lensLabel === l.model || lensLabel === full
+                      }) : null
+                      return lens ? (
+                        <div style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border)', paddingBottom: '0.3rem', marginBottom: '0.2rem' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Lente: </span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{lens.manufacturer} {lens.model}</strong>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>A-const: {lens.aConstant}</span>
+                          {lens.material && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>• {lens.material}</span>}
+                        </div>
+                      ) : null
+                    })()}
+                    {/* Biometry OD */}
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>👁️ OD Biometria</span><br />
+                      <span>K1: <strong>{biometry.OD.K1.toFixed(2)}</strong> D</span>{' '}
+                      <span>K2: <strong>{biometry.OD.K2.toFixed(2)}</strong> D</span><br />
+                      <span>AL: <strong>{biometry.OD.AL.toFixed(2)}</strong> mm</span>{' '}
+                      <span>ACD: <strong>{biometry.OD.ACD.toFixed(2)}</strong> mm</span>
+                      {(biometry.OD.LT > 0) && <span> • LT: <strong>{biometry.OD.LT.toFixed(1)}</strong> mm</span>}
+                      {(biometry.OD.WTW > 0) && <span> • WTW: <strong>{biometry.OD.WTW.toFixed(1)}</strong> mm</span>}
+                    </div>
+                    {/* Surgery params */}
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>🔪 Cirurgia</span><br />
+                      <span>SIA: <strong>{surgeryParams.SIA.toFixed(2)}</strong> D</span>{' '}
+                      <span>@ {surgeryParams.SIAAxis}°</span><br />
+                      <span>Ref Alvo OD: <strong>{surgeryParams.OD.refTarget.toFixed(2)}</strong> D</span>
+                      {surgeryParams.OD.seIOLPower > 0 && <span> • SE IOL: <strong>{surgeryParams.OD.seIOLPower.toFixed(1)}</strong> D</span>}
+                    </div>
+                    {/* Calculator info */}
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>🧮 Calculadora</span><br />
+                      <span>ID: <strong>{r.calculatorId}</strong></span><br />
+                      <span>K Index: 1.3375</span>
+                      {r.durationMs && <span> • Tempo: <strong>{(r.durationMs / 1000).toFixed(1)}s</strong></span>}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {r.results.map((eyeResult, j) => (
                 <div key={eyeResult.eye + j} style={{
