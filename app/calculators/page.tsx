@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/app/components/AppShell'
 import CalculatorCard from '@/app/components/ui/CalculatorCard'
+import CalculationModal, { type CalcProgress } from '@/app/components/ui/CalculationModal'
 import { CALCULATORS, type CalculatorId } from '@/app/lib/calculator-types'
 import { IOL_CATALOG, getManufacturers, getLensesByManufacturer, TIER_LABELS, TYPE_LABELS, type IOL, type IOLTier } from '@/app/lib/iol-catalog'
 import { useBiometryStore, type SurgeryParams, type CalculatorResult } from '@/app/stores/biometry-store'
@@ -34,6 +35,13 @@ export default function CalculatorsPage() {
   const [showSavePreset, setShowSavePreset] = useState(false)
   const [presetName, setPresetName] = useState('')
 
+  // Modal state
+  const [showModal, setShowModal] = useState(false)
+  const [calcProgress, setCalcProgress] = useState<CalcProgress[]>([])
+  const [calcElapsed, setCalcElapsed] = useState(0)
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined)
+  const allResultsRef = useRef<CalculatorResult[]>([])
+
   useEffect(() => {
     if (!biometry) router.push('/')
   }, [biometry, router])
@@ -59,77 +67,127 @@ export default function CalculatorsPage() {
     setSurgeryParams({ [eye]: { ...surgeryParams[eye], [field]: value } })
   }
 
-  const handleCalculate = async () => {
+  const handleCalculate = useCallback(async () => {
     if (!biometry || selectedLenses.length === 0 || selectedCalcs.size === 0) return
     setCalculating(true)
     setCalcError(null)
+    setShowModal(true)
+    setCalcElapsed(0)
 
-    const allResults: CalculatorResult[] = []
+    // Start elapsed timer
+    const calcStart = Date.now()
+    timerRef.current = setInterval(() => {
+      setCalcElapsed(Math.floor((Date.now() - calcStart) / 1000))
+    }, 200)
 
+    // Build all operations (lens × calculator)
+    const ops: { lens: IOL; calcId: CalculatorId }[] = []
     for (const lens of selectedLenses) {
       for (const calcId of selectedCalcs) {
-        const calcMeta = CALCULATORS.find((c) => c.id === calcId)
-        try {
-          // Build payload for this lens × calculator
-          const payload = {
-            requestId: `qrlio-front-${Date.now()}-${lens.id}-${calcId}`,
-            source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
-            patient: { examId: meta?.examId, isDemoData: false },
-            calculator: { id: calcId, label: calcMeta?.label || calcId },
-            lens: {
-              id: lens.id,
-              brand: lens.manufacturer,
-              family: lens.model,
-              a_constant: lens.aConstant,
-              toric_available: lens.type.includes('toric'),
-              code: lens.manufacturerCode || lens.model,
-              haigisA0: lens.haigisA0,
-              haigisA1: lens.haigisA1,
-              haigisA2: lens.haigisA2,
-            },
-            eyes: {
-              OD: {
-                biometry: { AL: biometry.OD.AL, ACD: biometry.OD.ACD, LT: biometry.OD.LT, WTW: biometry.OD.WTW, CCT: biometry.OD.CCT, method: 'custom_a' as const },
-                keratometry: { selected: 'anterior' as const, K1: biometry.OD.K1, K2: biometry.OD.K2, K1Axis: biometry.OD.K1Axis ?? 0, K2Axis: biometry.OD.K2Axis ?? 90, Cyl: biometry.OD.Cyl, Axis: biometry.OD.Axis },
-                surgery: { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis, refTarget: surgeryParams.OD.refTarget },
-                calculatorPreferences: { seIOLPower: surgeryParams.OD.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },
-              },
-            },
-          }
-
-          const res = await fetch(`${WORKER_URL}/calculate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const data = await res.json()
-
-          allResults.push({
-            calculatorId: calcId,
-            calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
-            status: data.status,
-            results: data.results || [],
-            durationMs: data.audit?.durationMs,
-            error: data.status === 'failed' ? data.audit?.notes?.join('; ') : undefined,
-          })
-        } catch (err: any) {
-          allResults.push({
-            calculatorId: calcId,
-            calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
-            status: 'failed',
-            results: [],
-            error: err.message,
-          })
-        }
+        ops.push({ lens, calcId })
       }
     }
 
+    // Initialize progress: all pending
+    const initial: CalcProgress[] = ops.map(op => ({
+      lensId: op.lens.id,
+      lensLabel: `${op.lens.manufacturer} ${op.lens.model}`,
+      calculatorId: op.calcId,
+      status: 'pending',
+    }))
+    setCalcProgress(initial)
+
+    const allResults: CalculatorResult[] = []
+    let completedCount = 0
+
+    // Update one progress item
+    const updateProgress = (lensId: string, calcId: CalculatorId, update: Partial<CalcProgress>) => {
+      setCalcProgress(prev => prev.map(p =>
+        p.lensId === lensId && p.calculatorId === calcId ? { ...p, ...update } : p
+      ))
+    }
+
+    // Fire ALL operations in parallel
+    const promises = ops.map(async ({ lens, calcId }) => {
+      const calcMeta = CALCULATORS.find(c => c.id === calcId)
+
+      // Mark as running
+      updateProgress(lens.id, calcId, { status: 'running' })
+
+      const opStart = Date.now()
+      try {
+        const payload = {
+          requestId: `qrlio-front-${Date.now()}-${lens.id}-${calcId}`,
+          source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
+          patient: { examId: meta?.examId, isDemoData: false },
+          calculator: { id: calcId, label: calcMeta?.label || calcId },
+          lens: {
+            id: lens.id,
+            brand: lens.manufacturer,
+            family: lens.model,
+            a_constant: lens.aConstant,
+            toric_available: lens.type.includes('toric'),
+            code: lens.manufacturerCode || lens.model,
+            haigisA0: lens.haigisA0,
+            haigisA1: lens.haigisA1,
+            haigisA2: lens.haigisA2,
+          },
+          eyes: {
+            OD: {
+              biometry: { AL: biometry.OD.AL, ACD: biometry.OD.ACD, LT: biometry.OD.LT, WTW: biometry.OD.WTW, CCT: biometry.OD.CCT, method: 'custom_a' as const },
+              keratometry: { selected: 'anterior' as const, K1: biometry.OD.K1, K2: biometry.OD.K2, K1Axis: biometry.OD.K1Axis ?? 0, K2Axis: biometry.OD.K2Axis ?? 90, Cyl: biometry.OD.Cyl, Axis: biometry.OD.Axis },
+              surgery: { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis, refTarget: surgeryParams.OD.refTarget },
+              calculatorPreferences: { seIOLPower: surgeryParams.OD.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },
+            },
+          },
+        }
+
+        const res = await fetch(`${WORKER_URL}/calculate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        const durationMs = Date.now() - opStart
+
+        allResults.push({
+          calculatorId: calcId,
+          calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
+          status: data.status,
+          results: data.results || [],
+          durationMs,
+          error: data.status === 'failed' ? data.audit?.notes?.join('; ') : undefined,
+        })
+
+        updateProgress(lens.id, calcId, { status: data.status === 'failed' ? 'failed' : 'completed', durationMs })
+      } catch (err: any) {
+        allResults.push({
+          calculatorId: calcId,
+          calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
+          status: 'failed',
+          results: [],
+          error: err.message,
+        })
+        updateProgress(lens.id, calcId, { status: 'failed', error: err.message })
+      }
+    })
+
+    await Promise.all(promises)
+
+    // Done — store results
+    clearInterval(timerRef.current)
     setCalculationResults(allResults)
+    allResultsRef.current = allResults
+    // Modal stays open showing completion; user clicks "Ver resultados"
+  }, [biometry, selectedLenses, selectedCalcs, surgeryParams, meta, WORKER_URL, setCalculationResults])
+
+  const handleModalClose = useCallback(() => {
+    setShowModal(false)
     setCalculating(false)
     router.push('/results')
-  }
+  }, [router])
 
   return (
     <AppShell>
@@ -409,6 +467,17 @@ export default function CalculatorsPage() {
           )}
         </button>
       </div>
+
+      {/* ── Calculation Progress Modal ── */}
+      {showModal && (
+        <CalculationModal
+          lenses={selectedLenses}
+          calculatorIds={[...selectedCalcs]}
+          progress={calcProgress}
+          elapsed={calcElapsed}
+          onClose={handleModalClose}
+        />
+      )}
     </AppShell>
   )
 }
