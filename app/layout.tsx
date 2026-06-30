@@ -3,8 +3,8 @@ import { Toaster } from 'sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'QRLIO — Extração de Biometria Ocular',
-  description: 'Pipeline inteligente de extração e cálculo LIO com Gemini + Claude',
+  title: 'QRLIO — Extração Inteligente de Biometria Ocular',
+  description: '5 engines de IA em paralelo extraem K1, K2, AL, ACD e refração de 12 equipamentos. Consensus Engine com tolerâncias clínicas. 6 calculadoras LIO integradas.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

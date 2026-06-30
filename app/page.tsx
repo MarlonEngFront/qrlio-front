@@ -119,12 +119,18 @@ export default function UploadPage() {
             margin: '0 0 0.35rem',
           }}
         >
-          Extração de biometria ocular
+          Extração Inteligente de Biometria Ocular
         </h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
-          Pipeline inteligente com <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>Gemini 2.0 Flash</strong> +{' '}
-          <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>Claude Haiku</strong> em paralelo.
-          Consensus Engine com tolerâncias clínicas. Suporte a 6 calculadoras LIO.
+          5 engines de IA em paralelo —{' '}
+          <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>Gemini 2.5 Flash</strong>,{' '}
+          <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>Qwen VL 72B</strong>,{' '}
+          <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>DeepSeek</strong>,{' '}
+          <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>Mimo Omni</strong> e{' '}
+          <strong style={{ color: 'var(--accent)', fontWeight: 500 }}>Nidek Parser</strong>.
+          Compatível com 12 equipamentos (IOLMaster, Lenstar, Argos, Nidek, Topcon, Tomey e mais).{' '}
+          Consensus Engine com tolerâncias clínicas por campo.{' '}
+          Extração automática de K1, K2, AL, ACD e refração — pronto para cálculo LIO em segundos.
         </p>
       </div>
 
