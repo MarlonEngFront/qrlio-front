@@ -46,8 +46,6 @@ export default function CalculatorsPage() {
     if (!biometry) router.push('/')
   }, [biometry, router])
 
-  if (!biometry) return null
-
   const manufacturers = getManufacturers()
   const lensesForMfr = activeMfr ? getLensesByManufacturer(activeMfr) : []
 
@@ -80,25 +78,40 @@ export default function CalculatorsPage() {
       setCalcElapsed(Math.floor((Date.now() - calcStart) / 1000))
     }, 200)
 
-    // Build all operations (lens × calculator)
-    const ops: { lens: IOL; calcId: CalculatorId }[] = []
+    // Agrupa calculadoras selecionadas em chunks: as lentas (ESCRS, Barrett V2.0 —
+    // ~60-180s) vao sozinhas num bundle, pra nao bloquear o feedback de progresso
+    // das rapidas/medias, que sao agrupadas ate 4 por chamada (limite do schema
+    // do bundle no worker).
+    const SLOW_THRESHOLD_SECONDS = 45
+    const BUNDLE_CHUNK_SIZE = 4
+    const calcIds = [...selectedCalcs]
+    const slowIds = calcIds.filter((id) => (CALCULATORS.find((c) => c.id === id)?.estimatedSeconds ?? 0) >= SLOW_THRESHOLD_SECONDS)
+    const fastIds = calcIds.filter((id) => !slowIds.includes(id))
+    const chunks: CalculatorId[][] = slowIds.map((id) => [id])
+    for (let i = 0; i < fastIds.length; i += BUNDLE_CHUNK_SIZE) {
+      chunks.push(fastIds.slice(i, i + BUNDLE_CHUNK_SIZE))
+    }
+
+    // Build all operations (lens × chunk de calculadoras)
+    const ops: { lens: IOL; chunk: CalculatorId[] }[] = []
     for (const lens of selectedLenses) {
-      for (const calcId of selectedCalcs) {
-        ops.push({ lens, calcId })
+      for (const chunk of chunks) {
+        ops.push({ lens, chunk })
       }
     }
 
-    // Initialize progress: all pending
-    const initial: CalcProgress[] = ops.map(op => ({
-      lensId: op.lens.id,
-      lensLabel: `${op.lens.manufacturer} ${op.lens.model}`,
-      calculatorId: op.calcId,
-      status: 'pending',
-    }))
+    // Initialize progress: all pending (um item por lente × calculadora)
+    const initial: CalcProgress[] = selectedLenses.flatMap((lens) =>
+      calcIds.map((calcId) => ({
+        lensId: lens.id,
+        lensLabel: `${lens.manufacturer} ${lens.model}`,
+        calculatorId: calcId,
+        status: 'pending' as const,
+      }))
+    )
     setCalcProgress(initial)
 
     const allResults: CalculatorResult[] = []
-    let completedCount = 0
 
     // Update one progress item
     const updateProgress = (lensId: string, calcId: CalculatorId, update: Partial<CalcProgress>) => {
@@ -107,20 +120,17 @@ export default function CalculatorsPage() {
       ))
     }
 
-    // Fire ALL operations in parallel
-    const promises = ops.map(async ({ lens, calcId }) => {
-      const calcMeta = CALCULATORS.find(c => c.id === calcId)
-
-      // Mark as running
-      updateProgress(lens.id, calcId, { status: 'running' })
+    // Fire um bundle por (lente × chunk de calculadoras), tudo em paralelo
+    const promises = ops.map(async ({ lens, chunk }) => {
+      for (const calcId of chunk) updateProgress(lens.id, calcId, { status: 'running' })
 
       const opStart = Date.now()
       try {
         const payload = {
-          requestId: `qrlio-front-${Date.now()}-${lens.id}-${calcId}`,
+          requestId: `qrlio-front-${Date.now()}-${lens.id}-${chunk.join('+')}`,
           source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
           patient: { examId: meta?.examId, isDemoData: false },
-          calculator: { id: calcId, label: calcMeta?.label || calcId },
+          calculators: chunk.map((calcId) => ({ id: calcId, label: CALCULATORS.find((c) => c.id === calcId)?.label || calcId })),
           lens: {
             id: lens.id,
             brand: lens.manufacturer,
@@ -142,7 +152,7 @@ export default function CalculatorsPage() {
           },
         }
 
-        const res = await fetch(`${WORKER_URL}/calculate`, {
+        const res = await fetch(`${WORKER_URL}/calculate/bundle`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -152,25 +162,31 @@ export default function CalculatorsPage() {
         const data = await res.json()
         const durationMs = Date.now() - opStart
 
-        allResults.push({
-          calculatorId: calcId,
-          calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
-          status: data.status,
-          results: data.results || [],
-          durationMs,
-          error: data.status === 'failed' ? data.audit?.notes?.join('; ') : undefined,
-        })
-
-        updateProgress(lens.id, calcId, { status: data.status === 'failed' ? 'failed' : 'completed', durationMs })
+        for (const calcId of chunk) {
+          const calcMeta = CALCULATORS.find(c => c.id === calcId)
+          const calcResult = data.results?.[calcId]
+          allResults.push({
+            calculatorId: calcId,
+            calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
+            status: calcResult?.status ?? 'failed',
+            results: calcResult?.results || [],
+            durationMs,
+            error: calcResult?.status === 'failed' ? calcResult?.audit?.notes?.join('; ') : undefined,
+          })
+          updateProgress(lens.id, calcId, { status: calcResult?.status === 'failed' ? 'failed' : 'completed', durationMs })
+        }
       } catch (err: any) {
-        allResults.push({
-          calculatorId: calcId,
-          calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
-          status: 'failed',
-          results: [],
-          error: err.message,
-        })
-        updateProgress(lens.id, calcId, { status: 'failed', error: err.message })
+        for (const calcId of chunk) {
+          const calcMeta = CALCULATORS.find(c => c.id === calcId)
+          allResults.push({
+            calculatorId: calcId,
+            calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
+            status: 'failed',
+            results: [],
+            error: err.message,
+          })
+          updateProgress(lens.id, calcId, { status: 'failed', error: err.message })
+        }
       }
     })
 
@@ -188,6 +204,8 @@ export default function CalculatorsPage() {
     setCalculating(false)
     router.push('/results')
   }, [router])
+
+  if (!biometry) return null
 
   return (
     <AppShell>
