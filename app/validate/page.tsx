@@ -327,7 +327,10 @@ export default function ValidatePage() {
           {meta?.consensusScore != null && (
             <span>
               <strong style={{ color: 'var(--text-primary)' }}>Consenso:</strong>{' '}
-              {Math.round(meta.consensusScore * 100)}%
+              <span style={{ color: oeIsEmpty ? 'var(--warning)' : undefined }}>
+                {Math.round(meta.consensusScore * 100)}%
+                {oeIsEmpty ? ' (só OD — OE ausente)' : ''}
+              </span>
             </span>
           )}
           {(meta?.engine1 || meta?.engine2) && (
