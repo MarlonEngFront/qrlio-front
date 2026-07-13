@@ -328,8 +328,9 @@ export default function ValidatePage() {
             <span>
               <strong style={{ color: 'var(--text-primary)' }}>Consenso:</strong>{' '}
               <span style={{ color: oeIsEmpty ? 'var(--warning)' : undefined }}>
-                {Math.round(meta.consensusScore * 100)}%
-                {oeIsEmpty ? ' (só OD — OE ausente)' : ''}
+                {oeIsEmpty
+                  ? `${Math.min(50, Math.round(meta.consensusScore * 100))}% (só OD — OE ausente)`
+                  : `${Math.round(meta.consensusScore * 100)}%`}
               </span>
             </span>
           )}
