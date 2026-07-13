@@ -139,16 +139,31 @@ export default function CalculatorsPage() {
 
       const opStart = Date.now()
       try {
+        const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
+        const k1AxisOd = biometry.OD.K1Axis ?? biometry.OD.Axis ?? 0
         const payload = {
           requestId: `qrlio-front-${Date.now()}-${calcId}`,
           source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
-          patient: { examId: meta?.examId, isDemoData: false },
+          patient: {
+            examId: meta?.examId,
+            patientId: meta?.patient?.id ?? undefined,
+            examTypeName: meta?.patient?.name ?? undefined,
+            isDemoData: false,
+          },
           calculator: { id: calcId, label: calcMeta?.label || calcId },
           lenses: selectedLenses.map(toIolFamily),
           eyes: {
             OD: {
               biometry: { AL: biometry.OD.AL, ACD: biometry.OD.ACD, LT: biometry.OD.LT, WTW: biometry.OD.WTW, CCT: biometry.OD.CCT, method: 'custom_a' as const },
-              keratometry: { selected: 'anterior' as const, K1: biometry.OD.K1, K2: biometry.OD.K2, K1Axis: biometry.OD.K1Axis ?? 0, K2Axis: biometry.OD.K2Axis ?? 90, Cyl: biometry.OD.Cyl, Axis: biometry.OD.Axis },
+              keratometry: {
+                selected: 'anterior' as const,
+                K1: biometry.OD.K1,
+                K2: biometry.OD.K2,
+                K1Axis: k1AxisOd,
+                K2Axis: biometry.OD.K2Axis ?? steepFromFlat(k1AxisOd),
+                Cyl: biometry.OD.Cyl,
+                Axis: biometry.OD.Axis,
+              },
               surgery: { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis, refTarget: surgeryParams.OD.refTarget },
               calculatorPreferences: { seIOLPower: surgeryParams.OD.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },
             },

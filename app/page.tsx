@@ -59,21 +59,27 @@ export default function UploadPage() {
 
   const handleCompleted = useCallback((status: ExamStatus, name: string, fileSize: number, fileType: string) => {
     // Converte EyeFields do worker → EyeData da store
+    const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
     const toEye = (e: { k1: number | null; k2: number | null; axial: number | null; acd: number | null;
-                         sphere: number | null; cylinder: number | null; axis: number | null } | null): EyeData => ({
-      K1: e?.k1 ?? 0,
-      K2: e?.k2 ?? 0,
-      AL: e?.axial ?? 0,
-      ACD: e?.acd ?? 0,
-      Cyl: e?.cylinder ?? 0,
-      Axis: e?.axis ?? 0,
-      LT: 4.5,
-      WTW: 12.0,
-      CCT: 540,
-      SIA: 0.5,
-      SIAAxis: 135,
-      refTarget: -0.25,
-    })
+                         sphere: number | null; cylinder: number | null; axis: number | null } | null): EyeData => {
+      const axis = e?.axis ?? null
+      return {
+        K1: e?.k1 ?? 0,
+        K2: e?.k2 ?? 0,
+        AL: e?.axial ?? 0,
+        ACD: e?.acd ?? 0,
+        Cyl: e?.cylinder ?? 0,
+        Axis: axis ?? 0,
+        K1Axis: axis ?? undefined,
+        K2Axis: axis != null ? steepFromFlat(axis) : undefined,
+        LT: 4.5,
+        WTW: 12.0,
+        CCT: 540,
+        SIA: 0.5,
+        SIAAxis: 135,
+        refTarget: -0.25,
+      }
+    }
 
     const biometry: ParsedBiometry = {
       OD: toEye(status.od),
