@@ -22,10 +22,13 @@ export interface EyeFields {
 }
 
 export interface PatientInfo {
+  id?: string | null
   name: string | null
   dob: string | null
   age: number | null
   gender: string | null
+  examDate?: string | null
+  operator?: string | null
 }
 
 export interface DeviceInfo {

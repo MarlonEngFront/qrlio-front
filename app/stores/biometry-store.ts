@@ -27,10 +27,13 @@ export interface BiometryMeta {
   engine1?: string
   engine2?: string
   patient?: {
+    id?: string | null
     name: string | null
     dob: string | null
     age: number | null
     gender: string | null
+    examDate?: string | null
+    operator?: string | null
   } | null
   device?: {
     type: string | null

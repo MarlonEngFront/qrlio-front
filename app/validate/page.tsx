@@ -55,6 +55,17 @@ function formatDob(dob: string | null | undefined): string | null {
   return dob
 }
 
+function formatExamDate(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  // 2020-07-20T15:58:00 → 20/07/2020 15:58
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/)
+  if (iso) {
+    const date = `${iso[3]}/${iso[2]}/${iso[1]}`
+    return iso[4] != null ? `${date} ${iso[4]}:${iso[5]}` : date
+  }
+  return raw
+}
+
 function formatDuration(ms: number | undefined): string | null {
   if (ms == null || !Number.isFinite(ms) || ms <= 0) return null
   const sec = Math.round(ms / 1000)
@@ -253,18 +264,20 @@ export default function ValidatePage() {
         flexDirection: 'column',
         gap: '0.45rem',
       }}>
-        {(meta?.patient?.name || meta?.patient?.dob || meta?.patient?.gender || meta?.patient?.age != null) ? (
+        {(meta?.patient?.name || meta?.patient?.dob || meta?.patient?.gender || meta?.patient?.age != null || meta?.patient?.id) ? (
           <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.45 }}>
             <strong style={{ fontWeight: 700 }}>
               {meta.patient?.name || 'Paciente não identificado'}
             </strong>
             {[
+              meta.patient?.id ? `ID ${meta.patient.id}` : null,
               formatGender(meta.patient?.gender),
               formatDob(meta.patient?.dob) ? `nasc. ${formatDob(meta.patient?.dob)}` : null,
               meta.patient?.age != null ? `${meta.patient.age}a` : null,
             ].filter(Boolean).length > 0 && (
               <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>
                 · {[
+                  meta.patient?.id ? `ID ${meta.patient.id}` : null,
                   formatGender(meta.patient?.gender),
                   formatDob(meta.patient?.dob) ? `nasc. ${formatDob(meta.patient?.dob)}` : null,
                   meta.patient?.age != null ? `${meta.patient.age}a` : null,
@@ -289,6 +302,18 @@ export default function ValidatePage() {
             <span>
               <strong style={{ color: 'var(--text-primary)' }}>Aparelho:</strong>{' '}
               {meta.device?.label || meta.device?.type}
+            </span>
+          )}
+          {formatExamDate(meta?.patient?.examDate) && (
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Data do exame:</strong>{' '}
+              {formatExamDate(meta?.patient?.examDate)}
+            </span>
+          )}
+          {meta?.patient?.operator && (
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Operador:</strong>{' '}
+              {meta.patient.operator}
             </span>
           )}
           {formatDuration(meta?.extractionDurationMs) && (
