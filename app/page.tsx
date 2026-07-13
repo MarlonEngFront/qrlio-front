@@ -69,7 +69,7 @@ export default function UploadPage() {
         AL: e?.axial ?? 0,
         ACD: e?.acd ?? 0,
         Cyl: e?.cylinder ?? 0,
-        Axis: axis ?? 0,
+        Axis: axis,
         K1Axis: axis ?? undefined,
         K2Axis: axis != null ? steepFromFlat(axis) : undefined,
         LT: 4.5,

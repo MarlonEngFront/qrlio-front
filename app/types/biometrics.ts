@@ -12,7 +12,8 @@ export interface EyeData {
   TK1?: number
   TK2?: number
   Cyl: number
-  Axis: number
+  /** Eixo do meridiano plano / CYL. null = não extraído (NÃO usar 0 como default). */
+  Axis: number | null
   ACD: number
   LT: number
   WTW: number

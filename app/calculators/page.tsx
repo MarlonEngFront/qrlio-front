@@ -140,7 +140,9 @@ export default function CalculatorsPage() {
       const opStart = Date.now()
       try {
         const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
+        // Axis null = não extraído; não confundir com meridiano 0°
         const k1AxisOd = biometry.OD.K1Axis ?? biometry.OD.Axis ?? 0
+        const k2AxisOd = biometry.OD.K2Axis ?? steepFromFlat(k1AxisOd)
         const payload = {
           requestId: `qrlio-front-${Date.now()}-${calcId}`,
           source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
@@ -160,9 +162,9 @@ export default function CalculatorsPage() {
                 K1: biometry.OD.K1,
                 K2: biometry.OD.K2,
                 K1Axis: k1AxisOd,
-                K2Axis: biometry.OD.K2Axis ?? steepFromFlat(k1AxisOd),
+                K2Axis: k2AxisOd,
                 Cyl: biometry.OD.Cyl,
-                Axis: biometry.OD.Axis,
+                Axis: biometry.OD.Axis ?? undefined,
               },
               surgery: { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis, refTarget: surgeryParams.OD.refTarget },
               calculatorPreferences: { seIOLPower: surgeryParams.OD.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },

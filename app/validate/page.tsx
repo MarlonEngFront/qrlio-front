@@ -243,6 +243,8 @@ export default function ValidatePage() {
     updateOE('CCT', od.CCT ?? 540)
     updateOE('Cyl', od.Cyl ?? 0)
     updateOE('Axis', od.Axis ?? 0)
+    if (od.K1Axis != null) updateOE('K1Axis', od.K1Axis)
+    if (od.K2Axis != null) updateOE('K2Axis', od.K2Axis)
   }
 
   return (

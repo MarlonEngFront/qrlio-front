@@ -150,18 +150,28 @@ export const useBiometryStore = create<BiometryStore>()(
       setCalculationResults: (calculationResults) => set({ calculationResults }),
 
       updateODField: (field, value) =>
-        set((s) => ({
-          biometry: s.biometry
-            ? { ...s.biometry, OD: { ...s.biometry.OD, [field]: value } }
-            : null,
-        })),
+        set((s) => {
+          if (!s.biometry) return {}
+          const OD: EyeData = { ...s.biometry.OD, [field]: value }
+          if (field === 'Axis' && value != null && Number.isFinite(value)) {
+            const flat = Number(value)
+            OD.K1Axis = flat
+            OD.K2Axis = flat + 90 > 180 ? flat - 90 : flat + 90
+          }
+          return { biometry: { ...s.biometry, OD } }
+        }),
 
       updateOEField: (field, value) =>
-        set((s) => ({
-          biometry: s.biometry
-            ? { ...s.biometry, OE: { ...s.biometry.OE, [field]: value } }
-            : null,
-        })),
+        set((s) => {
+          if (!s.biometry) return {}
+          const OE: EyeData = { ...s.biometry.OE, [field]: value }
+          if (field === 'Axis' && value != null && Number.isFinite(value)) {
+            const flat = Number(value)
+            OE.K1Axis = flat
+            OE.K2Axis = flat + 90 > 180 ? flat - 90 : flat + 90
+          }
+          return { biometry: { ...s.biometry, OE } }
+        }),
 
       setFileDataUrl: (url) => set({ fileDataUrl: url }),
 
