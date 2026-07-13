@@ -89,6 +89,11 @@ export default function UploadPage() {
       uploadedAt: new Date().toISOString(),
       status: status.status,
       consensusScore: status.consensus_score ?? undefined,
+      extractionDurationMs: status.extraction_duration_ms ?? undefined,
+      engine1: status.engine_1 ?? undefined,
+      engine2: status.engine_2 ?? undefined,
+      patient: status.patient ?? null,
+      device: status.device ?? null,
     }
 
     // Não mapeia resultados automáticos — o wizard de calculadoras fará isso sob demanda

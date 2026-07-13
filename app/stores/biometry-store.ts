@@ -24,6 +24,18 @@ export interface BiometryMeta {
   status: string
   consensusScore?: number
   extractionDurationMs?: number
+  engine1?: string
+  engine2?: string
+  patient?: {
+    name: string | null
+    dob: string | null
+    age: number | null
+    gender: string | null
+  } | null
+  device?: {
+    type: string | null
+    label: string | null
+  } | null
 }
 
 export interface SurgeryParams {

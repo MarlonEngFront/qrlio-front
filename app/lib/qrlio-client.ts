@@ -21,12 +21,26 @@ export interface EyeFields {
   axis: number | null
 }
 
+export interface PatientInfo {
+  name: string | null
+  dob: string | null
+  age: number | null
+  gender: string | null
+}
+
+export interface DeviceInfo {
+  type: string | null
+  label: string | null
+}
+
 export interface ExamStatus {
   id: string
   file_hash: string
   status: string
   od: EyeFields | null
   oe: EyeFields | null
+  patient?: PatientInfo | null
+  device?: DeviceInfo | null
   consensus_passed: boolean | null
   validation_passed: boolean | null
   consensus_score: number | null

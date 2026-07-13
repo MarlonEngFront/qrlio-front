@@ -41,6 +41,39 @@ function isEyeEmpty(eye: EyeData): boolean {
   return (!eye.AL || eye.AL === 0) && (!eye.K1 || eye.K1 === 0)
 }
 
+function formatGender(g: string | null | undefined): string | null {
+  if (!g) return null
+  if (g === 'female') return 'Feminino'
+  if (g === 'male') return 'Masculino'
+  return g
+}
+
+function formatDob(dob: string | null | undefined): string | null {
+  if (!dob) return null
+  const m = dob.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  return dob
+}
+
+function formatDuration(ms: number | undefined): string | null {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) return null
+  const sec = Math.round(ms / 1000)
+  return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m ${sec % 60}s`
+}
+
+function engineLabel(id: string | undefined): string | null {
+  if (!id) return null
+  const map: Record<string, string> = {
+    'gemini-flash': 'Gemini Flash',
+    'qwen-vl': 'Qwen VL',
+    deepseek: 'DeepSeek',
+    mimo: 'Mimo Omni',
+    'nidek-parser': 'Nidek Parser',
+    'iolmaster-parser': 'IOLMaster Parser',
+  }
+  return map[id] || id
+}
+
 function EyeColumn({
   eyeKey,
   eye,
@@ -209,8 +242,74 @@ export default function ValidatePage() {
         </h1>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
           {meta?.filename || 'Exame'} — Compare o documento original com os campos extraídos
-          {meta?.consensusScore ? ` • Consenso: ${Math.round(meta.consensusScore * 100)}%` : ''}
         </p>
+      </div>
+
+      {/* ── Exam header: patient + device + extraction meta ── */}
+      <div className="card" style={{
+        padding: '0.85rem 1.1rem',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.45rem',
+      }}>
+        {(meta?.patient?.name || meta?.patient?.dob || meta?.patient?.gender || meta?.patient?.age != null) ? (
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.45 }}>
+            <strong style={{ fontWeight: 700 }}>
+              {meta.patient?.name || 'Paciente não identificado'}
+            </strong>
+            {[
+              formatGender(meta.patient?.gender),
+              formatDob(meta.patient?.dob) ? `nasc. ${formatDob(meta.patient?.dob)}` : null,
+              meta.patient?.age != null ? `${meta.patient.age}a` : null,
+            ].filter(Boolean).length > 0 && (
+              <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>
+                · {[
+                  formatGender(meta.patient?.gender),
+                  formatDob(meta.patient?.dob) ? `nasc. ${formatDob(meta.patient?.dob)}` : null,
+                  meta.patient?.age != null ? `${meta.patient.age}a` : null,
+                ].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Dados do paciente não encontrados no exame
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem 1rem',
+          fontSize: '0.75rem',
+          color: 'var(--text-secondary)',
+        }}>
+          {(meta?.device?.label || meta?.device?.type) && (
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Aparelho:</strong>{' '}
+              {meta.device?.label || meta.device?.type}
+            </span>
+          )}
+          {formatDuration(meta?.extractionDurationMs) && (
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Extração:</strong>{' '}
+              {formatDuration(meta?.extractionDurationMs)}
+            </span>
+          )}
+          {meta?.consensusScore != null && (
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Consenso:</strong>{' '}
+              {Math.round(meta.consensusScore * 100)}%
+            </span>
+          )}
+          {(meta?.engine1 || meta?.engine2) && (
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Engines:</strong>{' '}
+              {[engineLabel(meta.engine1), engineLabel(meta.engine2)].filter(Boolean).join(' + ')}
+            </span>
+          )}
+        </div>
       </div>
 
       <div style={{
