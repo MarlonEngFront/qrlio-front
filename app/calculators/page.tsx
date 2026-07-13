@@ -139,8 +139,8 @@ export default function CalculatorsPage() {
       try {
         const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
         // Axis null = não extraído; não confundir com meridiano 0°
-        const k1AxisOd = biometry.OD.K1Axis ?? biometry.OD.Axis ?? 0
-        const k2AxisOd = biometry.OD.K2Axis ?? steepFromFlat(k1AxisOd)
+        const k1AxisOd = biometry.OD.K1Axis ?? biometry.OD.Axis ?? undefined
+        const k2AxisOd = biometry.OD.K2Axis ?? (k1AxisOd != null ? steepFromFlat(k1AxisOd) : undefined)
         const payload = {
           requestId: `qrlio-front-${Date.now()}-${calcId}`,
           source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
