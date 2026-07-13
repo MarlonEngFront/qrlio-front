@@ -189,6 +189,19 @@ export default function ResultsPage() {
                       </span>
                     </div>
                   )}
+                  {eyeResult.warnings && eyeResult.warnings.length > 0 && (
+                    <div style={{ gridColumn: '1 / -1', marginTop: '0.35rem' }}>
+                      {eyeResult.warnings.map((w, wi) => (
+                        <div key={wi} style={{
+                          fontSize: '0.72rem', color: 'var(--warning)',
+                          padding: '0.35rem 0.5rem', background: 'var(--warning-glow)',
+                          borderRadius: 6, marginBottom: 4,
+                        }}>
+                          ⚠ {w}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {eyeResult.screenshotDataUrl && (
                     <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Screenshot do resultado</span>

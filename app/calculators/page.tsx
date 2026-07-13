@@ -170,15 +170,25 @@ export default function CalculatorsPage() {
 
         for (const lens of selectedLenses) {
           const lensResult = data.results?.[lens.id]
+          const status = lensResult?.status ?? 'failed'
+          const warnFromEyes = (lensResult?.results || [])
+            .flatMap((r: { warnings?: string[] }) => r.warnings || [])
+            .filter(Boolean)
           allResults.push({
             calculatorId: calcId,
             calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
-            status: lensResult?.status ?? 'failed',
+            status,
             results: lensResult?.results || [],
             durationMs,
-            error: lensResult?.status === 'failed' ? lensResult?.audit?.notes?.join('; ') : undefined,
+            error: status === 'failed' || status === 'partial'
+              ? (lensResult?.audit?.notes?.join('; ') || warnFromEyes.join('; ') || undefined)
+              : undefined,
           })
-          updateProgress(lens.id, calcId, { status: lensResult?.status === 'failed' ? 'failed' : 'completed', durationMs })
+          updateProgress(lens.id, calcId, {
+            status: status === 'failed' ? 'failed' : status === 'partial' ? 'failed' : 'completed',
+            durationMs,
+            error: status === 'partial' ? (warnFromEyes[0] || 'Parcial — sem linhas parseadas') : undefined,
+          })
         }
       } catch (err: any) {
         const msg = err.message || 'Falha no cálculo'
