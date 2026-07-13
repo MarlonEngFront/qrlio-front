@@ -77,10 +77,10 @@ export default function FileDropZone({ onFile, disabled }: FileDropZoneProps) {
         {dragOver ? 'Solte o arquivo aqui' : 'Arraste o exame ou clique'}
       </p>
       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-        PDF, JPG ou PNG da biometria — IOLMaster, Lenstar, Pentacam, Nidek
+        PDF, JPG ou PNG da biometria — IOLMaster, Lenstar, Argos, Nidek e mais
       </p>
       <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0.5rem 0 0' }}>
-        Máx. 10 MB — Extração paralela Gemini + Claude
+        Máx. 10 MB — 5 engines em paralelo (Gemini, Qwen, DeepSeek, Mimo, parsers) + consenso clínico
       </p>
     </div>
   )
