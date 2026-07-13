@@ -33,9 +33,7 @@ export default function CalculatorsPage() {
   const selectPreset = useBiometryStore((s) => s.selectSurgicalPreset)
 
   const [activeMfr, setActiveMfr] = useState('')
-  const [selectedCalcs, setSelectedCalcs] = useState<Set<CalculatorId>>(
-    new Set(['escrs', 'tecnis-toric', 'brascrs-multiformula']),
-  )
+  const [selectedCalcs, setSelectedCalcs] = useState<Set<CalculatorId>>(new Set())
   const [calculating, setCalculating] = useState(false)
   const [calcError, setCalcError] = useState<string | null>(null)
   const [showSavePreset, setShowSavePreset] = useState(false)
