@@ -32,7 +32,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           backdropFilter: 'blur(8px)',
         }}
       >
-        <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 1.5rem' }}>
+        <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
             {/* Logo */}
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
@@ -87,7 +87,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* ── Step labels mínimos ── */}
-        <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 1.5rem' }}>
+        <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
             {STEPS.map((step) => {
               const done = step.idx < stepIdx
@@ -130,7 +130,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* ── Main content ── */}
-      <main style={{ flex: 1, maxWidth: 1120, margin: '0 auto', width: '100%', padding: '2rem 1.5rem' }}>
+      <main style={{ flex: 1, maxWidth: 1800, margin: '0 auto', width: '100%', padding: '2rem 1.5rem' }}>
         {children}
       </main>
     </div>

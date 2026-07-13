@@ -215,13 +215,17 @@ export default function ValidatePage() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: fileDataUrl ? 'minmax(280px, 1fr) minmax(320px, 1.1fr)' : '1fr',
+        // Preview dominante (~65%) — OD/OE em colunas na faixa direita (~35%)
+        gridTemplateColumns: fileDataUrl
+          ? 'minmax(520px, 1.85fr) minmax(360px, 1fr)'
+          : '1fr',
         gap: '1.25rem',
         marginBottom: '1.5rem',
+        alignItems: 'start',
       }}>
         {/* ── Left: Document preview ── */}
         {fileDataUrl && (
-          <div className="card" style={{ padding: '0.75rem', overflow: 'hidden' }}>
+          <div className="card" style={{ padding: '0.75rem', overflow: 'hidden', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                 📄 Documento original
@@ -236,8 +240,19 @@ export default function ValidatePage() {
             </div>
             {fileDataUrl.startsWith('data:image/') || fileDataUrl.startsWith('data:application/pdf') ? (
               <iframe
-                src={fileDataUrl}
-                style={{ width: '100%', height: 'calc(100vh - 250px)', minHeight: 600, border: '1px solid var(--border)', borderRadius: 8 }}
+                src={
+                  fileDataUrl.startsWith('data:application/pdf')
+                    ? `${fileDataUrl}#zoom=100`
+                    : fileDataUrl
+                }
+                style={{
+                  width: '100%',
+                  height: 'calc(100vh - 220px)',
+                  minHeight: 720,
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  display: 'block',
+                }}
                 title="Documento original"
               />
             ) : (
@@ -300,7 +315,7 @@ export default function ValidatePage() {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gap: '0.75rem',
           }}>
             <EyeColumn
