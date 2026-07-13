@@ -106,8 +106,8 @@ export default function CalculationModal({ lenses, calculatorIds, progress, elap
               <div style={{
                 width: 56, height: 56, margin: '0 auto 0.75rem',
                 borderRadius: '50%',
-                background: failed > 0 ? 'var(--warning-glow)' : '#dcfce7',
-                border: `3px solid ${failed > 0 ? 'var(--warning)' : '#16a34a'}`,
+                background: failed > 0 ? 'var(--warning-glow)' : 'var(--accent-glow)',
+                border: `3px solid ${failed > 0 ? 'var(--warning)' : 'var(--accent)'}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <span style={{ fontSize: '1.5rem' }}>{failed > 0 ? '⚠️' : '✅'}</span>
@@ -144,24 +144,33 @@ export default function CalculationModal({ lenses, calculatorIds, progress, elap
               <div key={lens.id} style={{
                 padding: '0.6rem 0.75rem',
                 borderRadius: 10,
-                background: lensDone ? (fail > 0 ? 'var(--warning-glow)' : '#f0fdf4') : 'var(--bg-secondary)',
-                border: `1px solid ${lensDone ? (fail > 0 ? 'var(--warning)' : '#bbf7d0') : 'var(--border)'}`,
+                background: lensDone
+                  ? (fail > 0 ? 'var(--warning-glow)' : 'var(--accent-glow)')
+                  : 'var(--bg-secondary)',
+                border: `1px solid ${lensDone ? (fail > 0 ? 'var(--warning)' : 'var(--accent)') : 'var(--border)'}`,
                 transition: 'all 0.3s ease',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
                     <span style={{
-                      fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                      fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, flexShrink: 0,
                       background: lens.tier === 'premium' ? '#fef3c7' : lens.tier === 'intermediate' ? '#e0e7ff' : '#f1f5f9',
                       color: lens.tier === 'premium' ? '#92400e' : lens.tier === 'intermediate' ? '#3730a3' : '#475569',
                     }}>
                       {TIER_LABELS[lens.tier as IOLTier][0].split(' ')[1]}
                     </span>
-                    <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                    <strong style={{
+                      fontSize: '0.8rem',
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.3,
+                    }}>
                       {lens.manufacturer} {lens.model}
                     </strong>
                   </div>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: lensDone ? (fail > 0 ? 'var(--warning)' : '#16a34a') : 'var(--accent)' }}>
+                  <span style={{
+                    fontSize: '0.7rem', fontWeight: 600, flexShrink: 0, marginLeft: 8,
+                    color: lensDone ? (fail > 0 ? 'var(--warning)' : 'var(--accent)') : 'var(--accent)',
+                  }}>
                     {lensDone ? `${done}/${total} OK` : `${done}/${total}`}
                   </span>
                 </div>
@@ -174,9 +183,21 @@ export default function CalculationModal({ lenses, calculatorIds, progress, elap
                     return (
                       <span key={item.calculatorId} style={{
                         fontSize: '0.65rem', padding: '2px 8px', borderRadius: 12,
-                        background: isRunning ? 'var(--accent-glow)' : isDone ? '#dcfce7' : isFailed ? '#fef2f2' : 'var(--bg-secondary)',
-                        color: isRunning ? 'var(--accent)' : isDone ? '#16a34a' : isFailed ? '#dc2626' : 'var(--text-muted)',
-                        border: `1px solid ${isRunning ? 'var(--accent)' : isDone ? '#bbf7d0' : isFailed ? '#fecaca' : 'var(--border)'}`,
+                        background: isRunning
+                          ? 'var(--accent-glow)'
+                          : isDone
+                            ? 'var(--accent-glow)'
+                            : isFailed
+                              ? 'var(--danger-glow)'
+                              : 'var(--bg-secondary)',
+                        color: isRunning
+                          ? 'var(--accent)'
+                          : isDone
+                            ? 'var(--accent)'
+                            : isFailed
+                              ? 'var(--danger)'
+                              : 'var(--text-muted)',
+                        border: `1px solid ${isRunning ? 'var(--accent)' : isDone ? 'var(--accent)' : isFailed ? 'var(--danger)' : 'var(--border)'}`,
                         display: 'inline-flex', alignItems: 'center', gap: 3,
                         animation: isRunning ? 'pulse 1.5s ease-in-out infinite' : undefined,
                       }}>
@@ -185,7 +206,7 @@ export default function CalculationModal({ lenses, calculatorIds, progress, elap
                         {isFailed && '✗ '}
                         {CALC_LABELS[item.calculatorId] || item.calculatorId}
                         {item.durationMs && isDone && (
-                          <span style={{ opacity: 0.6, fontSize: '0.6rem' }}>{(item.durationMs / 1000).toFixed(1)}s</span>
+                          <span style={{ opacity: 0.7, fontSize: '0.6rem' }}>{(item.durationMs / 1000).toFixed(1)}s</span>
                         )}
                       </span>
                     )
