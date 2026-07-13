@@ -75,7 +75,9 @@ interface BiometryStore {
   fileDataUrl: string | null
   surgicalPresets: Record<string, SurgeryParams>
   activeSurgicalPreset: string
+  hasHydrated: boolean
 
+  setHasHydrated: (v: boolean) => void
   setBiometry: (b: ParsedBiometry, meta: BiometryMeta) => void
   clearAll: () => void
   setSelectedIOL: (iol: IOL | null) => void
@@ -104,6 +106,9 @@ export const useBiometryStore = create<BiometryStore>()(
       fileDataUrl: null,
       surgicalPresets: DEFAULT_PRESETS,
       activeSurgicalPreset: 'Padrão',
+      hasHydrated: false,
+
+      setHasHydrated: (v) => set({ hasHydrated: v }),
 
       setBiometry: (biometry, meta) =>
         set({
@@ -181,6 +186,9 @@ export const useBiometryStore = create<BiometryStore>()(
         surgicalPresets: state.surgicalPresets,
         activeSurgicalPreset: state.activeSurgicalPreset,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
     },
   ),
 )

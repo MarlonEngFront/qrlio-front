@@ -13,6 +13,7 @@ const WORKER_URL = process.env.NEXT_PUBLIC_QRLIO_WORKER_URL || 'http://localhost
 
 export default function CalculatorsPage() {
   const router = useRouter()
+  const hasHydrated = useBiometryStore((s) => s.hasHydrated)
   const biometry = useBiometryStore((s) => s.biometry)
   const meta = useBiometryStore((s) => s.meta)
   const surgeryParams = useBiometryStore((s) => s.surgeryParams)
@@ -43,8 +44,8 @@ export default function CalculatorsPage() {
   const allResultsRef = useRef<CalculatorResult[]>([])
 
   useEffect(() => {
-    if (!biometry) router.push('/')
-  }, [biometry, router])
+    if (hasHydrated && !biometry) router.push('/')
+  }, [hasHydrated, biometry, router])
 
   const manufacturers = getManufacturers()
   const lensesForMfr = activeMfr ? getLensesByManufacturer(activeMfr) : []
@@ -78,27 +79,24 @@ export default function CalculatorsPage() {
       setCalcElapsed(Math.floor((Date.now() - calcStart) / 1000))
     }, 200)
 
-    // Agrupa calculadoras selecionadas em chunks: as lentas (ESCRS, Barrett V2.0 —
-    // ~60-180s) vao sozinhas num bundle, pra nao bloquear o feedback de progresso
-    // das rapidas/medias, que sao agrupadas ate 4 por chamada (limite do schema
-    // do bundle no worker).
-    const SLOW_THRESHOLD_SECONDS = 45
-    const BUNDLE_CHUNK_SIZE = 4
+    // Uma chamada por calculadora selecionada, cada uma comparando TODAS as lentes
+    // selecionadas em paralelo (POST /calculate/compare-lenses — mesmo browser
+    // compartilhado, cada resultado e uma automacao real no site oficial, com
+    // screenshot de prova; sem atalho matematico). Como cada calculadora ja e uma
+    // chamada HTTP separada disparada em paralelo, uma calculadora lenta (ESCRS,
+    // Barrett V2.0) naturalmente nao bloqueia o feedback das outras.
     const calcIds = [...selectedCalcs]
-    const slowIds = calcIds.filter((id) => (CALCULATORS.find((c) => c.id === id)?.estimatedSeconds ?? 0) >= SLOW_THRESHOLD_SECONDS)
-    const fastIds = calcIds.filter((id) => !slowIds.includes(id))
-    const chunks: CalculatorId[][] = slowIds.map((id) => [id])
-    for (let i = 0; i < fastIds.length; i += BUNDLE_CHUNK_SIZE) {
-      chunks.push(fastIds.slice(i, i + BUNDLE_CHUNK_SIZE))
-    }
-
-    // Build all operations (lens × chunk de calculadoras)
-    const ops: { lens: IOL; chunk: CalculatorId[] }[] = []
-    for (const lens of selectedLenses) {
-      for (const chunk of chunks) {
-        ops.push({ lens, chunk })
-      }
-    }
+    const toIolFamily = (lens: IOL) => ({
+      id: lens.id,
+      brand: lens.manufacturer,
+      family: lens.model,
+      a_constant: lens.aConstant,
+      toric_available: lens.type.includes('toric'),
+      code: lens.manufacturerCode || lens.model,
+      haigisA0: lens.haigisA0,
+      haigisA1: lens.haigisA1,
+      haigisA2: lens.haigisA2,
+    })
 
     // Initialize progress: all pending (um item por lente × calculadora)
     const initial: CalcProgress[] = selectedLenses.flatMap((lens) =>
@@ -120,28 +118,18 @@ export default function CalculatorsPage() {
       ))
     }
 
-    // Fire um bundle por (lente × chunk de calculadoras), tudo em paralelo
-    const promises = ops.map(async ({ lens, chunk }) => {
-      for (const calcId of chunk) updateProgress(lens.id, calcId, { status: 'running' })
+    const promises = calcIds.map(async (calcId) => {
+      const calcMeta = CALCULATORS.find(c => c.id === calcId)
+      for (const lens of selectedLenses) updateProgress(lens.id, calcId, { status: 'running' })
 
       const opStart = Date.now()
       try {
         const payload = {
-          requestId: `qrlio-front-${Date.now()}-${lens.id}-${chunk.join('+')}`,
+          requestId: `qrlio-front-${Date.now()}-${calcId}`,
           source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
           patient: { examId: meta?.examId, isDemoData: false },
-          calculators: chunk.map((calcId) => ({ id: calcId, label: CALCULATORS.find((c) => c.id === calcId)?.label || calcId })),
-          lens: {
-            id: lens.id,
-            brand: lens.manufacturer,
-            family: lens.model,
-            a_constant: lens.aConstant,
-            toric_available: lens.type.includes('toric'),
-            code: lens.manufacturerCode || lens.model,
-            haigisA0: lens.haigisA0,
-            haigisA1: lens.haigisA1,
-            haigisA2: lens.haigisA2,
-          },
+          calculator: { id: calcId, label: calcMeta?.label || calcId },
+          lenses: selectedLenses.map(toIolFamily),
           eyes: {
             OD: {
               biometry: { AL: biometry.OD.AL, ACD: biometry.OD.ACD, LT: biometry.OD.LT, WTW: biometry.OD.WTW, CCT: biometry.OD.CCT, method: 'custom_a' as const },
@@ -152,7 +140,7 @@ export default function CalculatorsPage() {
           },
         }
 
-        const res = await fetch(`${WORKER_URL}/calculate/bundle`, {
+        const res = await fetch(`${WORKER_URL}/calculate/compare-lenses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -162,22 +150,20 @@ export default function CalculatorsPage() {
         const data = await res.json()
         const durationMs = Date.now() - opStart
 
-        for (const calcId of chunk) {
-          const calcMeta = CALCULATORS.find(c => c.id === calcId)
-          const calcResult = data.results?.[calcId]
+        for (const lens of selectedLenses) {
+          const lensResult = data.results?.[lens.id]
           allResults.push({
             calculatorId: calcId,
             calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
-            status: calcResult?.status ?? 'failed',
-            results: calcResult?.results || [],
+            status: lensResult?.status ?? 'failed',
+            results: lensResult?.results || [],
             durationMs,
-            error: calcResult?.status === 'failed' ? calcResult?.audit?.notes?.join('; ') : undefined,
+            error: lensResult?.status === 'failed' ? lensResult?.audit?.notes?.join('; ') : undefined,
           })
-          updateProgress(lens.id, calcId, { status: calcResult?.status === 'failed' ? 'failed' : 'completed', durationMs })
+          updateProgress(lens.id, calcId, { status: lensResult?.status === 'failed' ? 'failed' : 'completed', durationMs })
         }
       } catch (err: any) {
-        for (const calcId of chunk) {
-          const calcMeta = CALCULATORS.find(c => c.id === calcId)
+        for (const lens of selectedLenses) {
           allResults.push({
             calculatorId: calcId,
             calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
