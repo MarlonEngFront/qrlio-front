@@ -7,6 +7,11 @@ import CalculatorCard from '@/app/components/ui/CalculatorCard'
 import CalculationModal, { type CalcProgress } from '@/app/components/ui/CalculationModal'
 import { CALCULATORS, type CalculatorId } from '@/app/lib/calculator-types'
 import { IOL_CATALOG, getManufacturers, getLensesByManufacturer, TIER_LABELS, TYPE_LABELS, type IOL, type IOLTier } from '@/app/lib/iol-catalog'
+import {
+  formatBiometryPayloadError,
+  formatWorkerValidationError,
+  getCalculatorBiometryIssues,
+} from '@/app/lib/biometry-payload'
 import { useBiometryStore, type SurgeryParams, type CalculatorResult } from '@/app/stores/biometry-store'
 
 const WORKER_URL = process.env.NEXT_PUBLIC_QRLIO_WORKER_URL || 'http://localhost:3000'
@@ -66,8 +71,18 @@ export default function CalculatorsPage() {
     setSurgeryParams({ [eye]: { ...surgeryParams[eye], [field]: value } })
   }
 
+  const biometryIssues = biometry ? getCalculatorBiometryIssues(biometry, ['OD']) : []
+  const biometryBlocked = biometryIssues.length > 0
+
   const handleCalculate = useCallback(async () => {
     if (!biometry || selectedLenses.length === 0 || selectedCalcs.size === 0) return
+
+    const issues = getCalculatorBiometryIssues(biometry, ['OD'])
+    if (issues.length > 0) {
+      setCalcError(formatBiometryPayloadError(issues))
+      return
+    }
+
     setCalculating(true)
     setCalcError(null)
     setShowModal(true)
@@ -146,8 +161,11 @@ export default function CalculatorsPage() {
           body: JSON.stringify(payload),
         })
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const validationMsg = formatWorkerValidationError(data?.details)
+          throw new Error(validationMsg || data?.error || `HTTP ${res.status}`)
+        }
         const durationMs = Date.now() - opStart
 
         for (const lens of selectedLenses) {
@@ -163,15 +181,17 @@ export default function CalculatorsPage() {
           updateProgress(lens.id, calcId, { status: lensResult?.status === 'failed' ? 'failed' : 'completed', durationMs })
         }
       } catch (err: any) {
+        const msg = err.message || 'Falha no cálculo'
+        setCalcError(msg)
         for (const lens of selectedLenses) {
           allResults.push({
             calculatorId: calcId,
             calculatorLabel: `${calcMeta?.label || calcId} — ${lens.model}`,
             status: 'failed',
             results: [],
-            error: err.message,
+            error: msg,
           })
-          updateProgress(lens.id, calcId, { status: 'failed', error: err.message })
+          updateProgress(lens.id, calcId, { status: 'failed', error: msg })
         }
       }
     })
@@ -455,10 +475,23 @@ export default function CalculatorsPage() {
         </div>
       </div>
 
-      {/* Error */}
-      {calcError && (
-        <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'var(--danger-glow)', border: '1px solid var(--danger)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--danger)' }}>
-          {calcError}
+      {/* Biometry / calc errors */}
+      {(biometryBlocked || calcError) && (
+        <div style={{
+          marginTop: '1rem', padding: '0.75rem',
+          background: 'var(--danger-glow)', border: '1px solid var(--danger)',
+          borderRadius: 8, fontSize: '0.8rem', color: 'var(--danger)',
+          whiteSpace: 'pre-line',
+        }}>
+          {calcError || formatBiometryPayloadError(biometryIssues)}
+          {biometryBlocked && (
+            <div style={{ marginTop: 8 }}>
+              <button className="btn-ghost" onClick={() => router.push('/validate')}
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderColor: 'var(--danger)', color: 'var(--danger)' }}>
+                ← Corrigir em Validar
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -466,9 +499,13 @@ export default function CalculatorsPage() {
       <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: '1.5rem' }}>
         <button className="btn-ghost" onClick={() => router.push('/validate')}>← Ajustar dados</button>
         <button className="btn-primary"
-          disabled={selectedLenses.length === 0 || selectedCalcs.size === 0 || calculating}
+          disabled={selectedLenses.length === 0 || selectedCalcs.size === 0 || calculating || biometryBlocked}
           onClick={handleCalculate}
-          style={{ opacity: (selectedLenses.length === 0 || selectedCalcs.size === 0) ? 0.4 : 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}
+          style={{
+            opacity: (selectedLenses.length === 0 || selectedCalcs.size === 0 || biometryBlocked) ? 0.4 : 1,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
+          }}
+          title={biometryBlocked ? formatBiometryPayloadError(biometryIssues) : undefined}
         >
           <span style={{ fontSize: '0.85rem' }}>
             {calculating ? '⏳ Calculando...' : `Calcular ${selectedLenses.length} lente(s) × ${selectedCalcs.size} calc(s)`}

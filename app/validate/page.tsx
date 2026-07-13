@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/app/components/AppShell'
 import { useBiometryStore } from '@/app/stores/biometry-store'
 import type { EyeData } from '@/app/types/biometrics'
+import {
+  CALCULATOR_AL_RANGE,
+  getCalculatorBiometryIssues,
+  isAlReadyForCalc,
+} from '@/app/lib/biometry-payload'
 
 const EYE_COLORS = { OD: '#f29121', OE: '#71ba66' }
 
@@ -47,6 +52,9 @@ export default function ValidatePage() {
   const updateFn = activeEye === 'OD' ? updateOD : updateOE
   const oeIsEmpty = activeEye === 'OE' && (!eye.AL || eye.AL === 0) && (!eye.K1 || eye.K1 === 0)
   const odIsEmpty = activeEye === 'OD' && (!eye.AL || eye.AL === 0) && (!eye.K1 || eye.K1 === 0)
+  const odIssues = getCalculatorBiometryIssues(biometry, ['OD'])
+  const canProceed = odIssues.length === 0
+  const odAlMissing = !isAlReadyForCalc(biometry.OD)
 
   return (
     <AppShell>
@@ -139,6 +147,13 @@ export default function ValidatePage() {
               ⚠️ Nenhum dado extraído para o olho direito. Verifique o documento.
             </div>
           )}
+          {odAlMissing && (
+            <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--danger-glow)', border: '1px solid var(--danger)', borderRadius: 8, fontSize: '0.72rem', color: 'var(--danger)' }}>
+              AL do OD obrigatório para calcular (mín. {CALCULATOR_AL_RANGE.min} mm, máx. {CALCULATOR_AL_RANGE.max} mm).
+              Valor atual: {Number.isFinite(biometry.OD.AL) ? `${biometry.OD.AL} mm` : 'ausente'}.
+              Preencha antes de prosseguir.
+            </div>
+          )}
 
           {/* Fields */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -184,12 +199,23 @@ export default function ValidatePage() {
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn-ghost" onClick={() => router.push('/')}>← Voltar</button>
-        <button className="btn-primary" onClick={() => router.push('/calculators')}>
+        <button
+          className="btn-primary"
+          disabled={!canProceed}
+          onClick={() => router.push('/calculators')}
+          title={canProceed ? undefined : odIssues.map((i) => i.message).join(' · ')}
+          style={{ opacity: canProceed ? 1 : 0.4 }}
+        >
           Prosseguir → Lentes e Calculadoras
         </button>
       </div>
+      {!canProceed && (
+        <p style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: 'var(--danger)', textAlign: 'right' }}>
+          {odIssues.map((i) => i.message).join(' · ')}
+        </p>
+      )}
     </AppShell>
   )
 }
