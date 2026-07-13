@@ -434,14 +434,23 @@ export default function CalculatorsPage() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {CALCULATORS.map((calc) => (
-              <CalculatorCard
-                key={calc.id}
-                calc={calc}
-                selected={selectedCalcs.has(calc.id)}
-                onToggle={() => toggleCalc(calc.id)}
-              />
-            ))}
+            {CALCULATORS.map((calc) => {
+              const incompatibleLenses = calc.restrictedToManufacturer
+                ? selectedLenses.filter((l) => l.manufacturer !== calc.restrictedToManufacturer)
+                : []
+              const incompatibleWarning = incompatibleLenses.length
+                ? `${calc.restrictedToManufacturer} apenas — não vai calcular para: ${incompatibleLenses.map((l) => l.model).join(', ')}`
+                : undefined
+              return (
+                <CalculatorCard
+                  key={calc.id}
+                  calc={calc}
+                  selected={selectedCalcs.has(calc.id)}
+                  onToggle={() => toggleCalc(calc.id)}
+                  incompatibleWarning={incompatibleWarning}
+                />
+              )
+            })}
           </div>
         </div>
       </div>

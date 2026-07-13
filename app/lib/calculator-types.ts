@@ -21,6 +21,8 @@ export interface CalculatorCard {
   tags: string[]
   logoText: string
   logoBg: string
+  /** Se definido, esta calculadora só calcula lentes deste fabricante (nome exatamente como em IOL.manufacturer). */
+  restrictedToManufacturer?: string
 }
 
 export const CALCULATORS: CalculatorCard[] = [
@@ -47,6 +49,7 @@ export const CALCULATORS: CalculatorCard[] = [
     tags: ['Tórica', 'Multifocal', 'EDOF', 'Eyhance'],
     logoText: 'J&J',
     logoBg: '#dc2626',
+    restrictedToManufacturer: 'Johnson and Johnson Vision',
   },
   {
     id: 'apacrs-true-k-toric',

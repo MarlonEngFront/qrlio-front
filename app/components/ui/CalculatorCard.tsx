@@ -6,9 +6,10 @@ interface Props {
   calc: CalcCard
   selected: boolean
   onToggle: () => void
+  incompatibleWarning?: string
 }
 
-export default function CalculatorCard({ calc, selected, onToggle }: Props) {
+export default function CalculatorCard({ calc, selected, onToggle, incompatibleWarning }: Props) {
   return (
     <div
       className="card"
@@ -89,6 +90,21 @@ export default function CalculatorCard({ calc, selected, onToggle }: Props) {
               </span>
             )}
           </div>
+          {incompatibleWarning && (
+            <div
+              style={{
+                marginTop: '0.5rem',
+                fontSize: '0.7rem',
+                padding: '0.35rem 0.6rem',
+                borderRadius: 6,
+                background: 'var(--warning-glow)',
+                color: 'var(--warning)',
+                border: '1px solid rgba(240, 160, 32, 0.2)',
+              }}
+            >
+              ⚠️ {incompatibleWarning}
+            </div>
+          )}
         </div>
 
         {/* Checkbox */}
