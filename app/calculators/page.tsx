@@ -11,6 +11,7 @@ import {
   formatBiometryPayloadError,
   formatWorkerValidationError,
   getCalculatorBiometryIssues,
+  isEyeEmpty,
 } from '@/app/lib/biometry-payload'
 import { buildComparePayload } from '@/app/lib/calculator-payload'
 import { useBiometryStore, type SurgeryParams, type CalculatorResult } from '@/app/stores/biometry-store'
@@ -70,13 +71,14 @@ export default function CalculatorsPage() {
     setSurgeryParams({ [eye]: { ...surgeryParams[eye], [field]: value } })
   }
 
-  const biometryIssues = biometry ? getCalculatorBiometryIssues(biometry, ['OD']) : []
+  const eyesToCalculate: Array<'OD' | 'OE'> = biometry && !isEyeEmpty(biometry.OE) ? ['OD', 'OE'] : ['OD']
+  const biometryIssues = biometry ? getCalculatorBiometryIssues(biometry, eyesToCalculate) : []
   const biometryBlocked = biometryIssues.length > 0
 
   const handleCalculate = useCallback(async () => {
     if (!biometry || selectedLenses.length === 0 || selectedCalcs.size === 0) return
 
-    const issues = getCalculatorBiometryIssues(biometry, ['OD'])
+    const issues = getCalculatorBiometryIssues(biometry, eyesToCalculate)
     if (issues.length > 0) {
       setCalcError(formatBiometryPayloadError(issues))
       return

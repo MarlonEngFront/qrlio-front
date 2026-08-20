@@ -75,3 +75,8 @@ export function formatWorkerValidationError(details: unknown): string | null {
 export function isAlReadyForCalc(eye: EyeData): boolean {
   return Number.isFinite(eye.AL) && eye.AL >= CALCULATOR_AL_RANGE.min && eye.AL <= CALCULATOR_AL_RANGE.max
 }
+
+/** True when an eye has no real extracted data (AL and K1 both missing/zero). */
+export function isEyeEmpty(eye: EyeData): boolean {
+  return (!eye.AL || eye.AL === 0) && (!eye.K1 || eye.K1 === 0)
+}

@@ -9,6 +9,7 @@ import {
   CALCULATOR_AL_RANGE,
   getCalculatorBiometryIssues,
   isAlReadyForCalc,
+  isEyeEmpty,
 } from '@/app/lib/biometry-payload'
 
 const EYE_COLORS = { OD: '#f29121', OE: '#71ba66' }
@@ -35,10 +36,6 @@ const FIELDS: Array<{
 function fieldStatus(v: number | undefined, range: [number, number]): 'ok' | 'warn' | 'neutral' {
   if (v == null || !Number.isFinite(v) || v === 0) return 'neutral'
   return v >= range[0] && v <= range[1] ? 'ok' : 'warn'
-}
-
-function isEyeEmpty(eye: EyeData): boolean {
-  return (!eye.AL || eye.AL === 0) && (!eye.K1 || eye.K1 === 0)
 }
 
 function formatGender(g: string | null | undefined): string | null {

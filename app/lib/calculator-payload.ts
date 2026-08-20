@@ -1,6 +1,8 @@
 import type { IOL } from '@/app/lib/iol-catalog'
 import type { CalculatorId } from '@/app/lib/calculator-types'
+import type { EyeData } from '@/app/types/biometrics'
 import type { ParsedBiometry, SurgeryParams, BiometryMeta } from '@/app/stores/biometry-store'
+import { isEyeEmpty } from '@/app/lib/biometry-payload'
 
 export function toIolFamily(lens: IOL) {
   return {
@@ -16,7 +18,33 @@ export function toIolFamily(lens: IOL) {
   }
 }
 
-/** Payload de POST /calculate/compare-lenses — usado tanto no cálculo em lote quanto no retry pontual. */
+function buildEyePayload(eye: EyeData, eyeSurgery: SurgeryParams['OD'], sia: { SIA: number; SIAAxis: number }) {
+  const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
+  // Axis null = não extraído; não confundir com meridiano 0°
+  const k1Axis = eye.K1Axis ?? eye.Axis ?? undefined
+  const k2Axis = eye.K2Axis ?? (k1Axis != null ? steepFromFlat(k1Axis) : undefined)
+
+  return {
+    biometry: { AL: eye.AL, ACD: eye.ACD, LT: eye.LT, WTW: eye.WTW, CCT: eye.CCT, method: 'custom_a' as const },
+    keratometry: {
+      selected: 'anterior' as const,
+      K1: eye.K1,
+      K2: eye.K2,
+      K1Axis: k1Axis,
+      K2Axis: k2Axis,
+      Cyl: eye.Cyl,
+      Axis: eye.Axis ?? undefined,
+    },
+    surgery: { SIA: sia.SIA, SIAAxis: sia.SIAAxis, refTarget: eyeSurgery.refTarget },
+    calculatorPreferences: { seIOLPower: eyeSurgery.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },
+  }
+}
+
+/**
+ * Payload de POST /calculate/compare-lenses — usado tanto no cálculo em lote quanto no retry pontual.
+ * Inclui OE automaticamente quando o olho tem dado real (isEyeEmpty), não só OD — o worker já
+ * processa `eyes` genericamente, o gap era só aqui.
+ */
 export function buildComparePayload(
   calcId: CalculatorId,
   calcLabel: string,
@@ -25,10 +53,13 @@ export function buildComparePayload(
   surgeryParams: SurgeryParams,
   meta: BiometryMeta | null,
 ) {
-  const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
-  // Axis null = não extraído; não confundir com meridiano 0°
-  const k1AxisOd = biometry.OD.K1Axis ?? biometry.OD.Axis ?? undefined
-  const k2AxisOd = biometry.OD.K2Axis ?? (k1AxisOd != null ? steepFromFlat(k1AxisOd) : undefined)
+  const sia = { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis }
+  const eyes: Partial<Record<'OD' | 'OE', ReturnType<typeof buildEyePayload>>> = {
+    OD: buildEyePayload(biometry.OD, surgeryParams.OD, sia),
+  }
+  if (!isEyeEmpty(biometry.OE)) {
+    eyes.OE = buildEyePayload(biometry.OE, surgeryParams.OE, sia)
+  }
 
   return {
     requestId: `qrlio-front-${Date.now()}-${calcId}`,
@@ -41,22 +72,7 @@ export function buildComparePayload(
     },
     calculator: { id: calcId, label: calcLabel },
     lenses: lenses.map(toIolFamily),
-    eyes: {
-      OD: {
-        biometry: { AL: biometry.OD.AL, ACD: biometry.OD.ACD, LT: biometry.OD.LT, WTW: biometry.OD.WTW, CCT: biometry.OD.CCT, method: 'custom_a' as const },
-        keratometry: {
-          selected: 'anterior' as const,
-          K1: biometry.OD.K1,
-          K2: biometry.OD.K2,
-          K1Axis: k1AxisOd,
-          K2Axis: k2AxisOd,
-          Cyl: biometry.OD.Cyl,
-          Axis: biometry.OD.Axis ?? undefined,
-        },
-        surgery: { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis, refTarget: surgeryParams.OD.refTarget },
-        calculatorPreferences: { seIOLPower: surgeryParams.OD.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },
-      },
-    },
+    eyes,
   }
 }
 
