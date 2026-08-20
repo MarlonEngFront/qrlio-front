@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/app/components/AppShell'
-import { useBiometryStore } from '@/app/stores/biometry-store'
+import { CALCULATORS } from '@/app/lib/calculator-types'
+import { buildComparePayload, findLensForResult } from '@/app/lib/calculator-payload'
+import { useBiometryStore, type CalculatorResult } from '@/app/stores/biometry-store'
+
+const WORKER_URL = process.env.NEXT_PUBLIC_QRLIO_WORKER_URL || 'http://localhost:3000'
 
 export default function ResultsPage() {
   const router = useRouter()
@@ -11,9 +15,58 @@ export default function ResultsPage() {
   const biometry = useBiometryStore((s) => s.biometry)
   const meta = useBiometryStore((s) => s.meta)
   const results = useBiometryStore((s) => s.calculationResults)
+  const setCalculationResults = useBiometryStore((s) => s.setCalculationResults)
   const selectedLenses = useBiometryStore((s) => s.selectedLenses)
   const surgeryParams = useBiometryStore((s) => s.surgeryParams)
   const [expandedParams, setExpandedParams] = useState<Set<number>>(new Set())
+  const [retrying, setRetrying] = useState<Set<number>>(new Set())
+
+  const retryOne = async (index: number) => {
+    const r = results[index]
+    const lens = findLensForResult(r.calculatorLabel, selectedLenses)
+    if (!lens || !biometry) return
+
+    setRetrying((prev) => new Set(prev).add(index))
+    const calcId = r.calculatorId as (typeof CALCULATORS)[number]['id']
+    const calcLabel = r.calculatorLabel.split(' — ')[0]
+    const opStart = Date.now()
+    try {
+      const payload = buildComparePayload(calcId, calcLabel, [lens], biometry, surgeryParams, meta)
+      const res = await fetch(`${WORKER_URL}/calculate/compare-lenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`)
+      const durationMs = Date.now() - opStart
+      const lensResult = data.results?.[lens.id]
+      const status = lensResult?.status ?? 'failed'
+      const warnFromEyes = (lensResult?.results || [])
+        .flatMap((er: { warnings?: string[] }) => er.warnings || [])
+        .filter(Boolean)
+      const updated: CalculatorResult = {
+        calculatorId: r.calculatorId,
+        calculatorLabel: r.calculatorLabel,
+        status,
+        results: lensResult?.results || [],
+        durationMs,
+        error: status === 'failed' || status === 'partial'
+          ? (lensResult?.audit?.notes?.join('; ') || warnFromEyes.join('; ') || undefined)
+          : undefined,
+      }
+      setCalculationResults(results.map((item, i) => (i === index ? updated : item)))
+    } catch (err: any) {
+      const msg = err?.message || 'Falha no cálculo'
+      setCalculationResults(results.map((item, i) => (i === index ? { ...item, status: 'failed' as const, error: msg } : item)))
+    } finally {
+      setRetrying((prev) => {
+        const next = new Set(prev)
+        next.delete(index)
+        return next
+      })
+    }
+  }
 
   useEffect(() => {
     if (hasHydrated && !biometry) router.push('/')
@@ -64,14 +117,26 @@ export default function ResultsPage() {
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{r.calculatorLabel}</span>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: 8 }}>{r.calculatorId}</span>
                 </div>
-                <span style={{
-                  fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4,
-                  background: r.status === 'completed' ? 'var(--accent-glow)' : 'var(--danger-glow)',
-                  color: r.status === 'completed' ? 'var(--accent)' : 'var(--danger)',
-                }}>
-                  {r.status === 'completed' ? '✓ Completo' : r.status === 'partial' ? '⚠ Parcial' : '✗ Falhou'}
-                  {r.durationMs ? ` ${(r.durationMs / 1000).toFixed(1)}s` : ''}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4,
+                    background: r.status === 'completed' ? 'var(--accent-glow)' : 'var(--danger-glow)',
+                    color: r.status === 'completed' ? 'var(--accent)' : 'var(--danger)',
+                  }}>
+                    {r.status === 'completed' ? '✓ Completo' : r.status === 'partial' ? '⚠ Parcial' : '✗ Falhou'}
+                    {r.durationMs ? ` ${(r.durationMs / 1000).toFixed(1)}s` : ''}
+                  </span>
+                  {r.status !== 'completed' && (
+                    <button
+                      className="btn-ghost"
+                      disabled={retrying.has(i)}
+                      onClick={() => retryOne(i)}
+                      style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem', opacity: retrying.has(i) ? 0.5 : 1 }}
+                    >
+                      {retrying.has(i) ? '⏳ Tentando...' : '↻ Tentar novamente'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {r.error && (
@@ -107,11 +172,7 @@ export default function ResultsPage() {
                   }}>
                     {/* Lens info */}
                     {(() => {
-                      const lensLabel = r.calculatorLabel.split(' — ')[1]
-                      const lens = lensLabel ? selectedLenses.find(l => {
-                        const full = `${l.manufacturer} ${l.model}`
-                        return lensLabel === l.model || lensLabel === full
-                      }) : null
+                      const lens = findLensForResult(r.calculatorLabel, selectedLenses)
                       return lens ? (
                         <div style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border)', paddingBottom: '0.3rem', marginBottom: '0.2rem' }}>
                           <span style={{ color: 'var(--text-muted)' }}>Lente: </span>

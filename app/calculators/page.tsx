@@ -12,6 +12,7 @@ import {
   formatWorkerValidationError,
   getCalculatorBiometryIssues,
 } from '@/app/lib/biometry-payload'
+import { buildComparePayload } from '@/app/lib/calculator-payload'
 import { useBiometryStore, type SurgeryParams, type CalculatorResult } from '@/app/stores/biometry-store'
 
 const WORKER_URL = process.env.NEXT_PUBLIC_QRLIO_WORKER_URL || 'http://localhost:3000'
@@ -99,17 +100,6 @@ export default function CalculatorsPage() {
     // chamada HTTP separada disparada em paralelo, uma calculadora lenta (ESCRS,
     // Barrett V2.0) naturalmente nao bloqueia o feedback das outras.
     const calcIds = [...selectedCalcs]
-    const toIolFamily = (lens: IOL) => ({
-      id: lens.id,
-      brand: lens.manufacturer,
-      family: lens.model,
-      a_constant: lens.aConstant,
-      toric_available: lens.type.includes('toric'),
-      code: lens.manufacturerCode || lens.model,
-      haigisA0: lens.haigisA0,
-      haigisA1: lens.haigisA1,
-      haigisA2: lens.haigisA2,
-    })
 
     // Initialize progress: all pending (um item por lente × calculadora)
     const initial: CalcProgress[] = selectedLenses.flatMap((lens) =>
@@ -137,38 +127,7 @@ export default function CalculatorsPage() {
 
       const opStart = Date.now()
       try {
-        const steepFromFlat = (flat: number) => (flat + 90 > 180 ? flat - 90 : flat + 90)
-        // Axis null = não extraído; não confundir com meridiano 0°
-        const k1AxisOd = biometry.OD.K1Axis ?? biometry.OD.Axis ?? undefined
-        const k2AxisOd = biometry.OD.K2Axis ?? (k1AxisOd != null ? steepFromFlat(k1AxisOd) : undefined)
-        const payload = {
-          requestId: `qrlio-front-${Date.now()}-${calcId}`,
-          source: { app: 'qrlio-front', version: '0.1.0', environment: 'local' as const },
-          patient: {
-            examId: meta?.examId,
-            patientId: meta?.patient?.id ?? undefined,
-            examTypeName: meta?.patient?.name ?? undefined,
-            isDemoData: false,
-          },
-          calculator: { id: calcId, label: calcMeta?.label || calcId },
-          lenses: selectedLenses.map(toIolFamily),
-          eyes: {
-            OD: {
-              biometry: { AL: biometry.OD.AL, ACD: biometry.OD.ACD, LT: biometry.OD.LT, WTW: biometry.OD.WTW, CCT: biometry.OD.CCT, method: 'custom_a' as const },
-              keratometry: {
-                selected: 'anterior' as const,
-                K1: biometry.OD.K1,
-                K2: biometry.OD.K2,
-                K1Axis: k1AxisOd,
-                K2Axis: k2AxisOd,
-                Cyl: biometry.OD.Cyl,
-                Axis: biometry.OD.Axis ?? undefined,
-              },
-              surgery: { SIA: surgeryParams.SIA, SIAAxis: surgeryParams.SIAAxis, refTarget: surgeryParams.OD.refTarget },
-              calculatorPreferences: { seIOLPower: surgeryParams.OD.seIOLPower, kIndex: '1.3375' as const, cylinderConvention: 'plus' as const, includePCA: true },
-            },
-          },
-        }
+        const payload = buildComparePayload(calcId, calcMeta?.label || calcId, selectedLenses, biometry, surgeryParams, meta)
 
         const res = await fetch(`${WORKER_URL}/calculate/compare-lenses`, {
           method: 'POST',
