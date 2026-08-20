@@ -7,6 +7,7 @@ import { useBiometryStore } from '@/app/stores/biometry-store'
 
 export default function ResultsPage() {
   const router = useRouter()
+  const hasHydrated = useBiometryStore((s) => s.hasHydrated)
   const biometry = useBiometryStore((s) => s.biometry)
   const meta = useBiometryStore((s) => s.meta)
   const results = useBiometryStore((s) => s.calculationResults)
@@ -15,8 +16,8 @@ export default function ResultsPage() {
   const [expandedParams, setExpandedParams] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    if (!biometry) router.push('/')
-  }, [biometry, router])
+    if (hasHydrated && !biometry) router.push('/')
+  }, [hasHydrated, biometry, router])
 
   if (!biometry) return null
 
