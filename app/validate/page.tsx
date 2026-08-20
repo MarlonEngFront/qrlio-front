@@ -212,6 +212,7 @@ function EyeColumn({
 
 export default function ValidatePage() {
   const router = useRouter()
+  const hasHydrated = useBiometryStore((s) => s.hasHydrated)
   const biometry = useBiometryStore((s) => s.biometry)
   const originalBiometry = useBiometryStore((s) => s.originalBiometry)
   const meta = useBiometryStore((s) => s.meta)
@@ -221,8 +222,8 @@ export default function ValidatePage() {
   const [showOriginal, setShowOriginal] = useState(false)
 
   useEffect(() => {
-    if (!biometry) router.push('/')
-  }, [biometry, router])
+    if (hasHydrated && !biometry) router.push('/')
+  }, [hasHydrated, biometry, router])
 
   if (!biometry) return null
 
@@ -297,49 +298,75 @@ export default function ValidatePage() {
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           gap: '0.5rem 1rem',
-          fontSize: '0.75rem',
-          color: 'var(--text-secondary)',
         }}>
-          {(meta?.device?.label || meta?.device?.type) && (
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Aparelho:</strong>{' '}
-              {meta.device?.label || meta.device?.type}
-            </span>
-          )}
-          {formatExamDate(meta?.patient?.examDate) && (
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Data do exame:</strong>{' '}
-              {formatExamDate(meta?.patient?.examDate)}
-            </span>
-          )}
-          {meta?.patient?.operator && (
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Operador:</strong>{' '}
-              {meta.patient.operator}
-            </span>
-          )}
-          {formatDuration(meta?.extractionDurationMs) && (
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Extração:</strong>{' '}
-              {formatDuration(meta?.extractionDurationMs)}
-            </span>
-          )}
-          {meta?.consensusScore != null && (
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Consenso:</strong>{' '}
-              <span style={{ color: oeIsEmpty ? 'var(--warning)' : undefined }}>
-                {oeIsEmpty
-                  ? `${Math.min(50, Math.round(meta.consensusScore * 100))}% (só OD — OE ausente)`
-                  : `${Math.round(meta.consensusScore * 100)}%`}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem 1rem',
+            fontSize: '0.75rem',
+            color: 'var(--text-secondary)',
+          }}>
+            {(meta?.device?.label || meta?.device?.type) && (
+              <span>
+                <strong style={{ color: 'var(--text-primary)' }}>Aparelho:</strong>{' '}
+                {meta.device?.label || meta.device?.type}
               </span>
-            </span>
-          )}
-          {(meta?.engine1 || meta?.engine2) && (
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Engines:</strong>{' '}
-              {[engineLabel(meta.engine1), engineLabel(meta.engine2)].filter(Boolean).join(' + ')}
-            </span>
+            )}
+            {formatExamDate(meta?.patient?.examDate) && (
+              <span>
+                <strong style={{ color: 'var(--text-primary)' }}>Data do exame:</strong>{' '}
+                {formatExamDate(meta?.patient?.examDate)}
+              </span>
+            )}
+            {meta?.patient?.operator && (
+              <span>
+                <strong style={{ color: 'var(--text-primary)' }}>Operador:</strong>{' '}
+                {meta.patient.operator}
+              </span>
+            )}
+            {meta?.consensusScore != null && (
+              <span>
+                <strong style={{ color: 'var(--text-primary)' }}>Consenso:</strong>{' '}
+                <span style={{ color: oeIsEmpty ? 'var(--warning)' : undefined }}>
+                  {oeIsEmpty
+                    ? `${Math.min(50, Math.round(meta.consensusScore * 100))}% (só OD — OE ausente)`
+                    : `${Math.round(meta.consensusScore * 100)}%`}
+                </span>
+              </span>
+            )}
+            {(meta?.engine1 || meta?.engine2) && (
+              <span>
+                <strong style={{ color: 'var(--text-primary)' }}>Engines:</strong>{' '}
+                {[engineLabel(meta.engine1), engineLabel(meta.engine2)].filter(Boolean).join(' + ')}
+              </span>
+            )}
+          </div>
+
+          {formatDuration(meta?.extractionDurationMs) && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.55rem',
+              fontSize: '0.7rem',
+              color: 'var(--text-secondary)',
+              whiteSpace: 'nowrap',
+            }}>
+              Velocidade da Extração
+              <span style={{
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.2rem 0.7rem',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+              }}>
+                {formatDuration(meta?.extractionDurationMs)}
+              </span>
+            </div>
           )}
         </div>
       </div>
