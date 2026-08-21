@@ -98,6 +98,7 @@ export default function UploadPage() {
       extractionDurationMs: status.extraction_duration_ms ?? undefined,
       engine1: status.engine_1 ?? undefined,
       engine2: status.engine_2 ?? undefined,
+      engineReadings: status.engineReadings ?? null,
       patient: status.patient ?? null,
       device: status.device ?? null,
     }

@@ -36,6 +36,23 @@ export interface DeviceInfo {
   label: string | null
 }
 
+/** Leitura bruta de um engine pra um olho — o que ele extraiu antes de virar consenso. */
+export interface EngineEyeReading {
+  k1: number | null
+  k2: number | null
+  axial: number | null
+  acd: number | null
+  sphere: number | null
+  cylinder: number | null
+  axis: number | null
+}
+
+export interface EngineReadings {
+  od: { engine1: EngineEyeReading | null; engine2: EngineEyeReading | null }
+  oe: { engine1: EngineEyeReading | null; engine2: EngineEyeReading | null }
+  tolerances: Record<string, number>
+}
+
 export interface ExamStatus {
   id: string
   file_hash: string
@@ -49,6 +66,7 @@ export interface ExamStatus {
   consensus_score: number | null
   engine_1: string | null
   engine_2: string | null
+  engineReadings?: EngineReadings | null
   extraction_duration_ms: number | null
   error_message: string | null
   created_at: string

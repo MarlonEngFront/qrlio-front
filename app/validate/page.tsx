@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/app/components/AppShell'
 import { useBiometryStore } from '@/app/stores/biometry-store'
 import type { EyeData } from '@/app/types/biometrics'
+import type { EngineEyeReading } from '@/app/lib/qrlio-client'
 import {
   CALCULATOR_AL_RANGE,
   getCalculatorBiometryIssues,
@@ -33,7 +34,7 @@ const FIELDS: Array<{
   { key: 'Axis', label: 'Eixo', shortLabel: 'Eixo', unit: '°', range: [0, 180], decimals: 0 },
 ]
 
-type FieldStatus = 'ok' | 'warn' | 'neutral' | 'default'
+type FieldStatus = 'ok' | 'warn' | 'neutral' | 'default' | 'disagreement'
 
 function fieldStatus(v: number | undefined, range: [number, number]): FieldStatus {
   if (v == null || !Number.isFinite(v) || v === 0) return 'neutral'
@@ -45,6 +46,13 @@ function fieldStatus(v: number | undefined, range: [number, number]): FieldStatu
 // calculators (ESCRS etc.) always get a safe, in-range number to submit. Must match
 // app/page.tsx's toEye() exactly, or this stops flagging the right values.
 const DEFAULT_PLACEHOLDER: Partial<Record<keyof EyeData, number>> = { LT: 4.5, WTW: 12.0, CCT: 540 }
+
+// Maps an EyeData field to the matching key in the raw per-engine reading returned by
+// the worker (/status engineReadings). Fields with no entry here (LT/WTW/CCT) were never
+// asked of any engine, so there's nothing to compare.
+const ENGINE_READING_KEY: Partial<Record<keyof EyeData, keyof EngineEyeReading>> = {
+  K1: 'k1', K2: 'k2', AL: 'axial', ACD: 'acd', Cyl: 'cylinder', Axis: 'axis',
+}
 
 function formatGender(g: string | null | undefined): string | null {
   if (!g) return null
@@ -82,6 +90,7 @@ function engineLabel(id: string | undefined): string | null {
   const map: Record<string, string> = {
     'gemini-flash': 'Gemini Flash',
     'qwen-vl': 'Qwen VL',
+    claude: 'Claude Haiku',
     deepseek: 'DeepSeek',
     mimo: 'Mimo Omni',
     'nidek-parser': 'Nidek Parser',
@@ -98,6 +107,7 @@ function EyeColumn({
   onUpdate,
   emptyWarning,
   headerExtra,
+  engineReadings,
 }: {
   eyeKey: 'OD' | 'OE'
   eye: EyeData
@@ -106,6 +116,7 @@ function EyeColumn({
   onUpdate: (key: keyof EyeData, value: number) => void
   emptyWarning?: string
   headerExtra?: ReactNode
+  engineReadings?: { engine1: EngineEyeReading | null; engine2: EngineEyeReading | null; tolerances: Record<string, number>; engine1Label?: string | null; engine2Label?: string | null } | null
 }) {
   const title = eyeKey === 'OD' ? 'OD Direito' : 'OE Esquerdo'
   const color = EYE_COLORS[eyeKey]
@@ -161,7 +172,24 @@ function EyeColumn({
           const origVal = origEye?.[key]
           const isEdited = !showOriginal && origVal != null && origVal !== val
           const isUnverifiedDefault = !isEdited && DEFAULT_PLACEHOLDER[key] != null && val === DEFAULT_PLACEHOLDER[key]
-          const status: FieldStatus = isUnverifiedDefault ? 'default' : fieldStatus(val ?? undefined, range)
+
+          // Did the 2 engines actually agree on this field, or did the final value get
+          // averaged from readings that disagreed beyond the same tolerance the backend's
+          // own consensus check uses? Purely informational — shows both raw readings,
+          // doesn't second-guess the pass/fail the backend already computed.
+          let disagreementTooltip: string | undefined
+          const readingKey = ENGINE_READING_KEY[key]
+          if (!isEdited && !isUnverifiedDefault && readingKey && engineReadings) {
+            const v1 = engineReadings.engine1?.[readingKey]
+            const v2 = engineReadings.engine2?.[readingKey]
+            const tolerance = engineReadings.tolerances[readingKey]
+            if (v1 != null && v2 != null && tolerance != null && Math.abs(v1 - v2) > tolerance) {
+              const l1 = engineReadings.engine1Label || 'Engine 1'
+              const l2 = engineReadings.engine2Label || 'Engine 2'
+              disagreementTooltip = `Engines discordam: ${l1}=${v1} vs ${l2}=${v2}. Confirme com o documento.`
+            }
+          }
+          const status: FieldStatus = isUnverifiedDefault ? 'default' : disagreementTooltip ? 'disagreement' : fieldStatus(val ?? undefined, range)
 
           return (
             <div
@@ -172,20 +200,20 @@ function EyeColumn({
                 gap: '0.35rem',
                 padding: '0.3rem 0.4rem',
                 borderRadius: 6,
-                background: isEdited ? 'var(--warning-glow)' : status === 'warn' ? 'var(--danger-glow)' : status === 'default' ? 'var(--warning-glow)' : 'transparent',
+                background: isEdited ? 'var(--warning-glow)' : status === 'warn' ? 'var(--danger-glow)' : status === 'default' ? 'var(--warning-glow)' : status === 'disagreement' ? 'rgba(91,141,239,0.12)' : 'transparent',
               }}
             >
               <span
-                title={status === 'default' ? 'Valor padrão — não extraído do documento. Confirme manualmente antes de calcular.' : undefined}
+                title={status === 'default' ? 'Valor padrão — não extraído do documento. Confirme manualmente antes de calcular.' : disagreementTooltip}
                 style={{
                   fontSize: '0.7rem',
                   fontWeight: 600,
                   width: 12,
                   textAlign: 'center',
-                  color: status === 'ok' ? 'var(--accent)' : status === 'warn' ? 'var(--danger)' : status === 'default' ? 'var(--warning)' : 'var(--text-muted)',
-                  cursor: status === 'default' ? 'help' : undefined,
+                  color: status === 'ok' ? 'var(--accent)' : status === 'warn' ? 'var(--danger)' : status === 'default' ? 'var(--warning)' : status === 'disagreement' ? '#5b8def' : 'var(--text-muted)',
+                  cursor: status === 'default' || status === 'disagreement' ? 'help' : undefined,
                 }}>
-                {status === 'ok' ? '✓' : status === 'warn' ? '!' : status === 'default' ? '?' : '·'}
+                {status === 'ok' ? '✓' : status === 'warn' ? '!' : status === 'default' ? '?' : status === 'disagreement' ? '≠' : '·'}
               </span>
               <span
                 title={label}
@@ -492,6 +520,12 @@ export default function ValidatePage() {
               showOriginal={showOriginal}
               onUpdate={updateOD}
               emptyWarning={odIsEmpty ? '⚠️ Nenhum dado extraído para o olho direito. Verifique o documento.' : undefined}
+              engineReadings={meta?.engineReadings ? {
+                ...meta.engineReadings.od,
+                tolerances: meta.engineReadings.tolerances,
+                engine1Label: engineLabel(meta.engine1),
+                engine2Label: engineLabel(meta.engine2),
+              } : null}
             />
             <EyeColumn
               eyeKey="OE"
@@ -511,6 +545,12 @@ export default function ValidatePage() {
                   📋 Copiar OD → OE
                 </button>
               ) : undefined}
+              engineReadings={meta?.engineReadings ? {
+                ...meta.engineReadings.oe,
+                tolerances: meta.engineReadings.tolerances,
+                engine1Label: engineLabel(meta.engine1),
+                engine2Label: engineLabel(meta.engine2),
+              } : null}
             />
           </div>
         </div>

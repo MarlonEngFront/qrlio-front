@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { EyeData } from '@/app/types/biometrics'
 import type { IOL } from '@/app/lib/iol-catalog'
+import type { EngineReadings } from '@/app/lib/qrlio-client'
 
 // ═══════════════════════════════════════════════════════════════════
 // Store Zustand — estado completo do fluxo QRLIO
@@ -26,6 +27,7 @@ export interface BiometryMeta {
   extractionDurationMs?: number
   engine1?: string
   engine2?: string
+  engineReadings?: EngineReadings | null
   patient?: {
     id?: string | null
     name: string | null
