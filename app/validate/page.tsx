@@ -33,10 +33,18 @@ const FIELDS: Array<{
   { key: 'Axis', label: 'Eixo', shortLabel: 'Eixo', unit: '°', range: [0, 180], decimals: 0 },
 ]
 
-function fieldStatus(v: number | undefined, range: [number, number]): 'ok' | 'warn' | 'neutral' {
+type FieldStatus = 'ok' | 'warn' | 'neutral' | 'default'
+
+function fieldStatus(v: number | undefined, range: [number, number]): FieldStatus {
   if (v == null || !Number.isFinite(v) || v === 0) return 'neutral'
   return v >= range[0] && v <= range[1] ? 'ok' : 'warn'
 }
+
+// LT/WTW/CCT are never actually extracted (no vision engine is asked for them) — the
+// store fills them with a plausible population-average placeholder purely so the real
+// calculators (ESCRS etc.) always get a safe, in-range number to submit. Must match
+// app/page.tsx's toEye() exactly, or this stops flagging the right values.
+const DEFAULT_PLACEHOLDER: Partial<Record<keyof EyeData, number>> = { LT: 4.5, WTW: 12.0, CCT: 540 }
 
 function formatGender(g: string | null | undefined): string | null {
   if (!g) return null
@@ -152,7 +160,8 @@ function EyeColumn({
           const val = showOriginal ? (origEye?.[key] ?? eye[key]) : eye[key]
           const origVal = origEye?.[key]
           const isEdited = !showOriginal && origVal != null && origVal !== val
-          const status = fieldStatus(val ?? undefined, range)
+          const isUnverifiedDefault = !isEdited && DEFAULT_PLACEHOLDER[key] != null && val === DEFAULT_PLACEHOLDER[key]
+          const status: FieldStatus = isUnverifiedDefault ? 'default' : fieldStatus(val ?? undefined, range)
 
           return (
             <div
@@ -163,17 +172,20 @@ function EyeColumn({
                 gap: '0.35rem',
                 padding: '0.3rem 0.4rem',
                 borderRadius: 6,
-                background: isEdited ? 'var(--warning-glow)' : status === 'warn' ? 'var(--danger-glow)' : 'transparent',
+                background: isEdited ? 'var(--warning-glow)' : status === 'warn' ? 'var(--danger-glow)' : status === 'default' ? 'var(--warning-glow)' : 'transparent',
               }}
             >
-              <span style={{
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                width: 12,
-                textAlign: 'center',
-                color: status === 'ok' ? 'var(--accent)' : status === 'warn' ? 'var(--danger)' : 'var(--text-muted)',
-              }}>
-                {status === 'ok' ? '✓' : status === 'warn' ? '!' : '·'}
+              <span
+                title={status === 'default' ? 'Valor padrão — não extraído do documento. Confirme manualmente antes de calcular.' : undefined}
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  width: 12,
+                  textAlign: 'center',
+                  color: status === 'ok' ? 'var(--accent)' : status === 'warn' ? 'var(--danger)' : status === 'default' ? 'var(--warning)' : 'var(--text-muted)',
+                  cursor: status === 'default' ? 'help' : undefined,
+                }}>
+                {status === 'ok' ? '✓' : status === 'warn' ? '!' : status === 'default' ? '?' : '·'}
               </span>
               <span
                 title={label}
