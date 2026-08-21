@@ -29,7 +29,7 @@ export const BIOMETRIC_RANGES = {
   K2:        { min: 37.0, max: 52.0, unit: 'D',   label: 'K2 (Ceratometria curva)', decimals: 2 },
   TK1:       { min: 37.0, max: 52.0, unit: 'D',   label: 'TK1 (Total)',            decimals: 2 },
   TK2:       { min: 37.0, max: 52.0, unit: 'D',   label: 'TK2 (Total)',            decimals: 2 },
-  Cyl:       { min: 0.0,  max: 10.0, unit: 'D',   label: 'Astigmatismo (Cyl)',     decimals: 2 },
+  Cyl:       { min: -10.0, max: 10.0, unit: 'D',  label: 'Astigmatismo (Cyl)',     decimals: 2 },
   Axis:      { min: 0,    max: 180,  unit: '°',   label: 'Eixo do Astigmatismo',   decimals: 0 },
   ACD:       { min: 2.0,  max: 4.5,  unit: 'mm',  label: 'Prof. Câmara Anterior',  decimals: 2 },
   LT:        { min: 2.0,  max: 6.0,  unit: 'mm',  label: 'Espessura do Cristalino', decimals: 2 },

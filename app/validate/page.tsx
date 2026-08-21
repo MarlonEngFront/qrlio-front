@@ -30,7 +30,7 @@ const FIELDS: Array<{
   { key: 'LT', label: 'LT (Espessura cristalino)', shortLabel: 'LT', unit: 'mm', range: [2, 7], decimals: 2 },
   { key: 'WTW', label: 'WTW (Branco a branco)', shortLabel: 'WTW', unit: 'mm', range: [10, 14], decimals: 2 },
   { key: 'CCT', label: 'CCT (Paquimetria)', shortLabel: 'CCT', unit: 'µm', range: [400, 700], decimals: 0 },
-  { key: 'Cyl', label: 'Cilindro', shortLabel: 'Cyl', unit: 'D', range: [0, 10], decimals: 2 },
+  { key: 'Cyl', label: 'Cilindro', shortLabel: 'Cyl', unit: 'D', range: [-10, 10], decimals: 2 },
   { key: 'Axis', label: 'Eixo', shortLabel: 'Eixo', unit: '°', range: [0, 180], decimals: 0 },
 ]
 
